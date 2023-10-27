@@ -1,0 +1,50 @@
+gpus: '0'
+output_dir: 'output'
+log_dir: 'log'
+num_transform: 0
+seg_stride: 1
+print_freq: 100
+end_epoch: 30
+
+MODEL:
+  in_dim: 36
+  n_jts_out: 36
+  dim: 512
+  depth: 2
+  heads: 8
+  dim_head: 64
+  mlp_dim: 512
+  dropout: 0.3
+
+DATASET:
+  dataset: ['ShanghaiTech', 'corridor']
+  headless: False
+  norm_scale: 0
+  prop_norm_scale: 1
+  seg_len: 300
+  return_indices: True
+  return_metadata: True
+  train_seg_conf_th: 0.3
+  specific_clip: ~
+  relative: False
+  normalize_pose_segs: False
+  symm_range: True
+  trans_list: ~
+
+LOADER:
+  batch_size: 512
+  num_workers: 0
+  pin_memory: True
+
+TEST:
+  batch_size: 256
+  num_workers: 16
+
+DEBUG:
+  debug: true
+
+data_dir: '/home/adaneshp/data_for_Gabe/'
+
+POSE_PATH:
+  train: 'train/'
+  test: 'test/'

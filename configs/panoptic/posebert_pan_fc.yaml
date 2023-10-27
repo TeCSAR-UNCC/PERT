@@ -1,0 +1,42 @@
+gpus: '0'
+output_dir: 'output'
+log_dir: 'log'
+num_workers: 32
+print_freq: 100
+
+MODEL:
+  out_kp: 15
+  out_chns: 2
+  window: 1
+  depth: 4
+  heads: 8
+  embedding: 'FC_Embbed'
+  EMB_ARGS:
+    out_features: 512
+
+DATASET:
+  train_dataset: 'panoptic'
+  test_dataset: 'panoptic'
+  root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
+  window_size: 300
+  stride: 1
+  test_subset: 'validation'
+  train_subset: 'train'
+  rootIDX: 1
+  camera_num: 10
+
+TRAIN:
+  batch_size: 512
+  shuffle: True
+  end_epoch: 15
+  resume: true
+  optimizer: adam
+  lr: 0.00001
+  num_workers: 0
+
+TEST:
+  batch_size: 256
+  num_workers: 0
+  
+DEBUG:
+  DEBUG: true

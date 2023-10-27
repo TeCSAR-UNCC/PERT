@@ -1,0 +1,35 @@
+JOINTS_DEF = {
+    'neck': 0,
+    'head': 1,
+    'mid-hip': 2,
+    'l-shoulder': 3,
+    'l-elbow': 4,
+    'l-wrist': 5,
+    'l-hip': 6,
+    'l-knee': 7,
+    'l-ankle': 8,
+    'r-shoulder': 9,
+    'r-elbow': 10,
+    'r-wrist': 11,
+    'r-hip': 12,
+    'r-knee': 13,
+    'r-ankle': 14,
+}
+
+
+JOINTS_PAIRS = [
+('neck', 'head'),
+('neck', 'l-shoulder'),
+('l-shoulder', 'l-elbow'),
+('l-elbow', 'l-wrist'),
+('neck', 'r-shoulder'),
+('r-shoulder', 'r-elbow'),
+('r-elbow', 'r-wrist'),
+('neck', 'mid-hip'),
+('mid-hip', 'l-hip'),
+('l-hip', 'l-knee'),
+('l-knee', 'l-ankle'),
+('mid-hip', 'r-hip'),
+('r-hip', 'r-knee'),
+('r-knee', 'r-ankle'),
+]
