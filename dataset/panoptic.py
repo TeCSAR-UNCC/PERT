@@ -337,6 +337,7 @@ class Panoptic(JointsDataset):
             # Apply the Kalman Filter on the concatenated data and velocity
             filtered_data[i] = self.kf_filter.apply(data_vel[i])[:, :2]
 
+        # First 10 unfiltered because idk whats wrong
         return np.concatenate((data[:10], filtered_data[10:]), axis=0)
 
     def _create_mask(self, window, addcls=True):
