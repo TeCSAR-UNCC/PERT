@@ -105,7 +105,7 @@ class BERTTrainer:
             gt = gt.to(self.device)
 
             # 1. forward the next_sentence_prediction and masked_lm model
-            mask_lm_output, cls_lm_output = self.model.forward(data, num_frames)
+            mask_lm_output = self.model.forward(data, num_frames)
             mask_lm_output = mask_lm_output[mask].view(*gt.shape)
 
             # 2-1. NLLLoss of predicting masked token word
@@ -129,13 +129,23 @@ class BERTTrainer:
             # 2-3. Adding next_loss and mask_loss : 3.4 Pre-training Procedure
             loss = mask_loss + class_loss
 
+            fea_mask = mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, 2)# [:, 1:]
+            features = (meta['mean'][fea_mask].view(512, 60, 1, 2), 
+                        meta['std'][fea_mask].view(512, 60, 1, 2))
+            unnorm_pred = data_loader.dataset.unnormalize_pose(mask_lm_output, features)
+            unnorm_gt = data_loader.dataset.unnormalize_pose(gt, features)
+
+            unnorm_mask_loss = self.criterion(unnorm_pred, unnorm_gt)
+            zero_pad = gt.sum(dim=-1) != 0
+            unnorm_mask_loss = unnorm_mask_loss[zero_pad].mean()
+
             # 3. backward and optimization only in train
             if train:
                 self.optim_schedule.zero_grad()
                 loss.backward()
                 self.optim_schedule.step_and_update_lr()
 
-            avg_loss += mask_loss.item()
+            avg_loss += unnorm_mask_loss.item()
             # avgcls_loss += class_loss.item()
 
             post_fix = {

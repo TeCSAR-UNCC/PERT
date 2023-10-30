@@ -159,17 +159,14 @@ class TransformerRegressor(nn.Module):
             # N regressors
             for j, reg in enumerate(layers_i[2:]):
                 y[j] = reg(x, init=y[j], n_iter=1)
-        
-        class_tokens = x[:, 0]
-        cls = self.classifier(class_tokens)
 
-        return y[0], cls
+        return y[0]
 
 
 class FC_Embbed(nn.Module):
-    def __init__(self, out_features=512):
+    def __init__(self, in_kp=15, in_chns=2, window=1, out_features=512):
         super(FC_Embbed, self).__init__()
-        self.fc = nn.LazyLinear(out_features)
+        self.fc = nn.Linear(in_kp*in_chns, out_features)
 
     def forward(self, x):
         x = x.view(*x.shape[:-2], -1)
@@ -180,7 +177,7 @@ class PoseBERT(nn.Module):
     def __init__(self,
                  out_kp=15, out_chns=2, init_pose=None, window=1,
                  depth=4, heads=8, dropout=0.1, share_regressor=1, 
-                 embedding='fc_embbed', EMB_ARGS={'out_features': 512},
+                 embedding='FC_Embbed', EMB_ARGS={'out_features': 512},
                  *args, **kwargs):
         super(PoseBERT, self).__init__()
         self.out_kp = out_kp
@@ -214,16 +211,16 @@ class PoseBERT(nn.Module):
         x = self.pos(x)  # inject position info
 
         batch_size, seq_len, *_ = x.size()
-        mask = None
-        # mask = torch.arange(x.size(1), device=x.device)
-        # mask = mask.expand(x.size(0), x.size(1)) 
-        # mask = mask >= padding.unsqueeze(1)
+        # mask = None
+        mask = torch.arange(x.size(1), device=x.device)
+        mask = mask.expand(x.size(0), x.size(1)) 
+        mask = mask >= padding.unsqueeze(1)
 
         # Transformer
         init = [self.init_pose.repeat(batch_size, seq_len, 1)]  # init mean pose
-        y, cls = self.decoder(x, init, mask)
+        y = self.decoder(x, init, mask)
         y = y.view(y.shape[0], y.shape[1] * self.window, self.out_kp, self.out_chns)
 
-        return y, cls
+        return y
     
     

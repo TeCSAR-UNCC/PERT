@@ -83,16 +83,17 @@ class JointsDataset(Dataset):
         :param symm_range:
         :return:
         """
-        if pose_data_zero_mean.shape[0] > self.window_size:
-            pose_data_zero_mean = pose_data_zero_mean[1:]
+        if pose_data_zero_mean.shape[1] > self.window_size:
+            pose_data_zero_mean = pose_data_zero_mean[:, 1:]
 
         if isinstance(features, dict):
             mean, std = features['mean'], features['std']
         else:
             mean, std = features
-        
-        mean, std = torch.from_numpy(mean), torch.from_numpy(std)
-        vid_res = torch.Tensor(self.norm)
+        device = pose_data_zero_mean.device
+
+        mean, std = mean.to(device), std.to(device)
+        vid_res = torch.Tensor(self.norm).to(device)
         symm_range = True
 
         pose_data_centered = (pose_data_zero_mean * std) + mean

@@ -4,7 +4,6 @@ from configs.config import update_config
 import dataset
 import numpy as np
 from utils import view_skeleton_batch
-from bert_pytorch.model import GCNEncoder, GCNDecoder
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train keypoints network')

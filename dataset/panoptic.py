@@ -364,11 +364,11 @@ class Panoptic(JointsDataset):
         data = self.db[idx:idx + self.window_size]
         data = self._filter_data(data)
         data, (mean, std) = self.normalize_pose(data)
-        data = torch.from_numpy(data)
+        data = torch.from_numpy(data).float()
 
-        mask = self._create_mask(data.shape[0])
+        mask = self._create_mask(data.shape[0], addcls=False)
 
-        data = self._tokenize(data)
+        # data = self._tokenize(data)
 
         # Create a copy of data at specified indices for gt
         gt = data[mask].clone()

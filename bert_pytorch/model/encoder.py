@@ -26,19 +26,26 @@ class GraphConvBlock(nn.Module):
 
 
 class GCNEncoder(nn.Module):
-    def __init__(self, arch, token_window_size, out_features, dropout=0.3):
+    def __init__(self, arch, token_window_size,
+                 out_features, in_kp=15, dropout=0.3):
         super(GCNEncoder, self).__init__()
-        self.edge_index = self.create_edge_tensor(token_window_size, True)
-        self.layers = []
+
+        edge_index = self.create_edge_tensor(token_window_size, True)
+        self.register_buffer('edge_index', edge_index)
+
+        self.fc_output_dim = out_features
+        self.token_window_size = token_window_size
+        self.layers = nn.ModuleList()
         for input_dim, output_dim in arch:
             self.layers.append(GraphConvBlock(input_dim, output_dim, dropout))
 
+        end_channels = arch[-1][-1]
+        in_features = token_window_size * in_kp * end_channels
         self.fc = nn.Sequential(
             # nn.LazyLinear(1028),
-            nn.LazyLinear(out_features)
+            nn.Linear(in_features, out_features)
         )
-        self.fc_output_dim = out_features
-        self.token_window_size = token_window_size
+        
 
     def forward(self, x):
         # Input shape (Batch, Window, Keypoints, xy)

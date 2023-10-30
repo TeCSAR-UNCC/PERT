@@ -19,7 +19,7 @@ import re
 from configs.config import config
 from configs.config import update_config
 from bert_pytorch import BERT, PoseBERT
-# from bert_pytorch import BERTTrainer
+from bert_pytorch import BERTTrainer
 from dataset.shanghai import get_dataset_and_loader
 from utils.data_utils import trans_list
 import dataset
@@ -94,21 +94,19 @@ def main():
     gpus = [int(i) for i in config.gpus.split(',')]
     print('=> Loading data ..')
     
-    loaders = return_dataloaders(config, gpus)
+    train_loader, test_loader = return_dataloaders(config, gpus)
 
     PERT = PoseBERT(**config.MODEL) 
-    tes = PERT(torch.rand(64, 300, 15, 2))
-    start = 0  
 
-    # trainer = BERTTrainer(PERT, train_loader, test_loader)
-    # trainer.model, start = load_latest_model(trainer.model) 
+    trainer = BERTTrainer(PERT, train_loader, test_loader)
+    trainer.model, start = load_latest_model(trainer.model)
 
-    # for epoch in range(start, config.end_epoch):
-    #     trainer.train(epoch)
-    #     trainer.save(epoch)
+    for epoch in range(start, config.TRAIN.end_epoch):
+        trainer.train(epoch)
+        trainer.save(epoch)
 
-    #     if trainer.test_data is not None:
-    #         trainer.test(epoch)
+        if trainer.test_data is not None:
+            trainer.test(epoch)
 
     # print("Pre_Training Complete!\n")
     # trainer.train_data = train_loader

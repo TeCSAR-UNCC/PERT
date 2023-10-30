@@ -28,15 +28,15 @@ DATASET:
 TRAIN:
   batch_size: 512
   shuffle: True
-  end_epoch: 15
+  end_epoch: 5
   resume: true
   optimizer: adam
   lr: 0.00001
-  num_workers: 0
+  num_workers: 32
 
 TEST:
   batch_size: 256
-  num_workers: 0
+  num_workers: 8
   
 DEBUG:
   DEBUG: true
