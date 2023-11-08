@@ -96,9 +96,10 @@ def main():
     
     train_loader, test_loader = return_dataloaders(config, gpus)
 
-    PERT = PoseBERT(**config.MODEL) 
+    PERT = PoseBERT(**config.MODEL)
+    pretrain = True
 
-    trainer = BERTTrainer(PERT, train_loader, test_loader)
+    trainer = BERTTrainer(PERT, pretrain, train_loader, test_loader)
     trainer.model, start = load_latest_model(trainer.model)
 
     for epoch in range(start, config.TRAIN.end_epoch):

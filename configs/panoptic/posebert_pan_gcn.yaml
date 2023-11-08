@@ -20,7 +20,11 @@ DATASET:
   train_dataset: 'panoptic'
   test_dataset: 'panoptic'
   root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-  window_size: &ws 300
+  window_size: 300
+  token_window_size: 10
+  add_cls: True
+  mix_chance: 0.5
+  mask_chance: 0.2
   stride: 1
   test_subset: 'validation'
   train_subset: 'train'
@@ -30,7 +34,7 @@ DATASET:
 TRAIN:
   batch_size: 512
   shuffle: True
-  end_epoch: 15
+  end_epoch: 5
   resume: true
   optimizer: adam
   lr: 0.00001

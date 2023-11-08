@@ -6,7 +6,7 @@ import torchmetrics
 from torch.utils.data import DataLoader
 # from memory_profiler import profile
 
-from ..model import BERTLM, BERT
+from ..model import PERT_Mask_Order, BERT
 from .optim_schedule import ScheduledOptim
 
 import tqdm
@@ -23,7 +23,7 @@ class BERTTrainer:
 
     """
 
-    def __init__(self, pert: BERT, train_dataloader: DataLoader, test_dataloader: DataLoader = None,
+    def __init__(self, pert: BERT, pretrain, train_dataloader: DataLoader, test_dataloader: DataLoader = None,
                  lr: float = 1e-4, betas=(0.9, 0.999), weight_decay: float = 0.01, warmup_steps=10000,
                  with_cuda: bool = True, cuda_devices=None, log_freq: int = 1000):
         """
@@ -41,11 +41,12 @@ class BERTTrainer:
         # Setup cuda device for BERT training, argument -c, --cuda should be true
         cuda_condition = torch.cuda.is_available() and with_cuda
         self.device = torch.device("cuda:0" if cuda_condition else "cpu")
-        self.pretrain = True
+        self.pretrain = pretrain
         # This BERT model will be saved every epoch
         # self.pert = pert
         # Initialize the BERT Language Model, with BERT model
-        self.model = pert.to(self.device) # BERTLM(pert).to(self.device)
+        self.token_window_size = train_dataloader.dataset.token_window_size
+        self.model =  PERT_Mask_Order(pert, self.token_window_size, num_cls=2).to(self.device)# pert.to(self.device) # 
 
         # Distributed GPU training if CUDA can detect more than 1 GPU
         if with_cuda and torch.cuda.device_count() > 1:
@@ -69,12 +70,12 @@ class BERTTrainer:
         print("Total Parameters:", sum([p.nelement() for p in self.model.parameters()]))
 
     def train(self, epoch):
-        self.iteration(epoch, self.train_data)
+        self.iteration(epoch, self.train_data, train=True)
 
     def test(self, epoch):
         self.iteration(epoch, self.test_data, train=False)
     # @profile
-    def iteration(self, epoch, data_loader, train=True):
+    def iteration(self, epoch, data_loader, train):
         """
         loop over the data_loader for training or testing
         if on train status, backward operation is activated
@@ -94,50 +95,37 @@ class BERTTrainer:
                               bar_format="{l_bar}{r_bar}")
                               
         avg_loss = 0.0
-        avgcls_loss = 0.0
+        cls_loss = 0.0
         acc = 0.0
-        accuracy_metric = torchmetrics.Accuracy(task='multiclass', num_classes=120).to(device=self.device)
+        accuracy_metric = torchmetrics.Accuracy(task='multiclass', num_classes=2).to(device=self.device)
 
         for i, batch in data_iter:
             # 0. batch_data will be sent into the device(GPU or cpu)
-            data, gt, mask, meta, num_frames = batch
+            data, gt, mixed, mask, meta, num_frames = batch
             data = data.to(self.device)
             gt = gt.to(self.device)
+            mixed = mixed.to(self.device)
 
             # 1. forward the next_sentence_prediction and masked_lm model
-            mask_lm_output = self.model.forward(data, num_frames)
-            mask_lm_output = mask_lm_output[mask].view(*gt.shape)
+            mask_output, mixed_output = self.model.forward(data, mask, num_frames)
 
             # 2-1. NLLLoss of predicting masked token word
             # Mask loss now
-            mask_loss = self.criterion(mask_lm_output, gt)
+            mask_loss = self.criterion(mask_output, gt)
             zero_pad = gt.sum(dim=-1) != 0
             mask_loss = mask_loss[zero_pad].mean()
 
-            class_loss = 0.0
-            if not self.pretrain:
-                # 2-2. NLL(negative log likelihood) loss of is_next classification result
-                
-                meta = meta.to(cls_lm_output.device)-1
+            class_loss = self.criterion(mixed_output, mixed).mean()
 
-                class_loss = self.criterion_cls(cls_lm_output, meta) * 100
-
-                pred_classes = torch.argmax(cls_lm_output, dim=1)
-                accuracy_metric.update(pred_classes, meta)
-                acc = accuracy_metric.compute().item()
+            pred_classes = torch.argmax(mixed_output, dim=1)
+            mixed = torch.argmax(mixed, dim=1)
+            accuracy_metric.update(pred_classes, mixed)
+            acc = accuracy_metric.compute().item()
 
             # 2-3. Adding next_loss and mask_loss : 3.4 Pre-training Procedure
             loss = mask_loss + class_loss
 
-            fea_mask = mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, 2)# [:, 1:]
-            features = (meta['mean'][fea_mask].view(512, 60, 1, 2), 
-                        meta['std'][fea_mask].view(512, 60, 1, 2))
-            unnorm_pred = data_loader.dataset.unnormalize_pose(mask_lm_output, features)
-            unnorm_gt = data_loader.dataset.unnormalize_pose(gt, features)
-
-            unnorm_mask_loss = self.criterion(unnorm_pred, unnorm_gt)
-            zero_pad = gt.sum(dim=-1) != 0
-            unnorm_mask_loss = unnorm_mask_loss[zero_pad].mean()
+            unnorm_mask_loss = self._unnorm_loss(mask_output, gt, mask, meta)
 
             # 3. backward and optimization only in train
             if train:
@@ -145,23 +133,23 @@ class BERTTrainer:
                 loss.backward()
                 self.optim_schedule.step_and_update_lr()
 
-            avg_loss += unnorm_mask_loss.item()
-            # avgcls_loss += class_loss.item()
+            avg_loss += unnorm_mask_loss.item()**(1/2)
+            cls_loss += class_loss.item()**(1/2)
 
             post_fix = {
                 "epoch": epoch,
                 "iter": i,
-                "avg_loss": (avg_loss / (i + 1))**(1/2),
-                # "class_loss": (avgcls_loss / (i + 1)),
+                "avg_loss": (avg_loss / (i + 1)),
+                "class_loss": (cls_loss / (i + 1)),
                 "class_acc": acc,
-                "loss": loss.item()**(1/2)
             }
 
             if i % self.log_freq == 0:
                 data_iter.write(str(post_fix))
 
-        print("EP%d_%s, avg_loss=" % (epoch, str_code), (avg_loss / len(data_iter))**(1/2), 
-              f"cls_loss= {(avgcls_loss / (i + 1))}", 
+        print("EP%d_%s, avg_loss=" % (epoch, str_code), 
+              f"cls_loss= {(avg_loss / len(data_iter))}", 
+              f"cls_loss= {(cls_loss / len(data_iter))}", 
               f"cls_acc= {accuracy_metric.compute().item()}")
 
     def save(self, epoch, file_path="output/bert_trained.model"):
@@ -176,3 +164,22 @@ class BERTTrainer:
         torch.save(self.model.state_dict(), output_path)
         print("EP:%d Model Saved on:" % epoch, output_path)
         return output_path
+
+    def _unnorm_loss(self, mask_output, gt, mask, meta):
+        fea_mask = mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, 2)
+        if self.train_data.dataset.add_cls:
+            fea_mask = fea_mask[:, 1:]
+
+        if self.token_window_size > 1:
+            fea_mask = fea_mask.repeat_interleave(self.token_window_size, dim=1)
+
+        features = (meta['mean'][fea_mask].view(*gt.shape[:2], 1, 2), 
+                    meta['std'][fea_mask].view(*gt.shape[:2], 1, 2))
+        unnorm_pred = self.train_data.dataset.unnormalize_pose(mask_output, features)
+        unnorm_gt = self.train_data.dataset.unnormalize_pose(gt, features)
+
+        unnorm_mask_loss = self.criterion(unnorm_pred, unnorm_gt)
+        zero_pad = gt.sum(dim=-1) != 0
+        unnorm_mask_loss = unnorm_mask_loss[zero_pad].mean()
+
+        return unnorm_mask_loss

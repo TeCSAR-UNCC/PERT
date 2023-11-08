@@ -169,9 +169,12 @@ class FC_Embbed(nn.Module):
         self.fc = nn.Linear(in_kp*in_chns, out_features)
 
     def forward(self, x):
-        x = x.view(*x.shape[:-2], -1)
+        x = self._tokenize(x)
         x = self.fc(x)
         return x
+    
+    def _tokenize(self, x):
+        return x.view(*x.shape[:-2], -1)
 
 class PoseBERT(nn.Module):
     def __init__(self,
@@ -188,14 +191,15 @@ class PoseBERT(nn.Module):
         self.emb = eval(embedding)(**EMB_ARGS)
         self.mask_token = nn.Parameter(torch.randn(1, 1, EMB_ARGS.out_features))
         dim_head = EMB_ARGS.out_features//heads
+        self.regout = out_kp * out_chns * window
 
         self.decoder = TransformerRegressor(EMB_ARGS.out_features, depth, heads, 
                                             dim_head, dim_head, dropout, 
-                                            [out_kp * out_chns * window],
+                                            [self.regout],
                                             share_regressor == 1)
 
         if init_pose is None:
-            init_pose = torch.zeros(out_kp * out_chns * window).float()
+            init_pose = torch.zeros(self.regout).float()
         self.register_buffer('init_pose', init_pose.reshape(1, 1, -1))
 
     def forward(self, x, padding=None):

@@ -57,15 +57,11 @@ class GCNEncoder(nn.Module):
         )
 
     def forward(self, x):
-        # Input shape (Batch, Window, Keypoints, Channels)
-        batch, window, keypoints, channels = x.shape
+        # x, org = self._tokenize(x)
 
-        # Calculate the number of tokens in each window
-        tokens = int(window / self.token_window_size)
-
-        # Reshape input to process in tokens
-        x = x.view(batch, tokens, self.token_window_size, keypoints, channels)
-        x = x.view(batch * tokens, self.token_window_size * keypoints, channels)
+        # batch, tokens, *_ = org
+        batch, tokens, keypoints, channels = x.shape
+        x = x.view(batch * tokens, keypoints, channels)
 
         # Pass input through each Graph Convolutional Layer
         for layer in self.layers:
@@ -77,6 +73,20 @@ class GCNEncoder(nn.Module):
 
         # Output shape (Batch, Tokens, fc_output_dim)
         return x
+
+    def _tokenize(self, x):
+        # Input shape (Batch, Window, Keypoints, Channels)
+        batch, window, keypoints, channels = x.shape
+
+        # Calculate the number of tokens in each window
+        tokens = int(window / self.token_window_size)
+
+        # Reshape input to process in tokens
+        x = x.view(batch, tokens, self.token_window_size, keypoints, channels)
+        org = (batch, tokens, self.token_window_size, keypoints, channels)
+        x = x.view(batch * tokens, self.token_window_size * keypoints, channels)
+
+        return x, org
     
     def create_edge_tensor(self, num_people, temporal_edges=False):
         """

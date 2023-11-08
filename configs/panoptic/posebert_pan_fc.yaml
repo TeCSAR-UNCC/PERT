@@ -19,6 +19,10 @@ DATASET:
   test_dataset: 'panoptic'
   root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
   window_size: 300
+  token_window_size: 1
+  add_cls: True
+  mix_chance: 0.5
+  mask_chance: 0.2
   stride: 1
   test_subset: 'validation'
   train_subset: 'train'

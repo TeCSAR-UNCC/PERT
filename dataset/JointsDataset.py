@@ -35,7 +35,11 @@ class JointsDataset(Dataset):
         self.dataset_name = cfg.DATASET.test_dataset
         self.window_size = cfg.DATASET.window_size
         self.stride = cfg.DATASET.stride
-        self.mask_chance = 0.2
+
+        self.mask_chance = cfg.DATASET.mask_chance
+        self.mix_chance = cfg.DATASET.mix_chance
+        self.token_window_size = cfg.DATASET.token_window_size
+        self.add_cls = cfg.DATASET.add_cls
 
         self.num_views = cfg.DATASET.camera_num
         self.joints_weight = 1
@@ -82,6 +86,7 @@ class JointsDataset(Dataset):
         :param vid_res:
         :param symm_range:
         :return:
+        Add for incase of zero padding
         """
         if pose_data_zero_mean.shape[1] > self.window_size:
             pose_data_zero_mean = pose_data_zero_mean[:, 1:]

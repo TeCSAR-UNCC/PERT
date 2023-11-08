@@ -340,25 +340,60 @@ class Panoptic(JointsDataset):
         # First 10 unfiltered because idk whats wrong
         return np.concatenate((data[:10], filtered_data[10:]), axis=0)
 
-    def _create_mask(self, window, addcls=True):
+    def _create_mask(self, window):
         # Create the mask
         masked_amount = int(window * self.mask_chance)
         mask = torch.cat((torch.ones(masked_amount, dtype=torch.bool), 
                         torch.zeros(window - masked_amount, dtype=torch.bool)))
         mask = mask[torch.randperm(window)]
         
-        if addcls:
+        if self.add_cls:
             mask = torch.cat((torch.tensor([0], dtype=torch.bool), mask))
 
         return mask
     
     def _tokenize(self, data):
-        # Add class token to data
-        cls_token = torch.ones_like(data[0]).unsqueeze(0) * -1
-        data = torch.cat((cls_token, data), dim=0).float()
-        # data = data.view(data.shape[0], -1)
+        
+        window, keypoints, channels = data.shape
+
+        # Calculate the number of tokens in each window
+        tokens = int(window / self.token_window_size)
+
+        # Reshape input to process in tokens
+        data = data.view(tokens, self.token_window_size, keypoints, channels)
+        data = data.view(tokens, self.token_window_size * keypoints, channels)
 
         return data
+    
+    def _class_token(self, data):
+        # Add class token to data
+        if self.add_cls:
+            cls_token = torch.ones_like(data[0]).unsqueeze(0) * -1
+            data = torch.cat((cls_token, data), dim=0).float()
+
+        return data
+    
+    def _mix(self, data):
+        length = data.shape[0]
+
+        # Draw a random number to determine if this example should be mixed
+        mixed = torch.rand(1).item() > self.mix_chance
+
+        if mixed:
+            # Compute random index for the example
+            min_index = int(length * 0.1)
+            max_index = int(length * 0.9)
+            random_index = torch.randint(min_index, max_index, (1,)).item()
+
+            # Apply rotation
+            mixed_data = torch.cat((data[random_index:], data[:random_index]), dim=0)
+            mixed = torch.eye(2)[0]
+
+            return mixed_data, mixed
+        
+        # If not mixed, just return the original data and zero for the shift index
+        mixed = torch.eye(2)[1]
+        return data, mixed
 
     def __getitem__(self, idx):
         idx = self.vf[idx]
@@ -367,15 +402,16 @@ class Panoptic(JointsDataset):
         data, (mean, std) = self.normalize_pose(data)
         data = torch.from_numpy(data).float()
 
-        mask = self._create_mask(data.shape[0], addcls=False)
+        data = self._tokenize(data)
+        mixed = torch.eye(2)[1]
+        if self.mix_chance > 0.0:
+            data, mixed = self._mix(data)
 
-        # data = self._tokenize(data)
-
-        # Create a copy of data at specified indices for gt
+        mask = self._create_mask(data.shape[0])
+        data = self._class_token(data)
+        
         gt = data[mask].clone()
-
-        # Mask the data tensor
-        data[mask] = 1.0
+        gt = gt.view(-1, int(gt.shape[1] // self.token_window_size), gt.shape[2])
         
         meta = self.meta.iloc[idx:idx + self.window_size]
         unq_videos = meta[['video', 'camera', 'id']].drop_duplicates()
@@ -388,9 +424,9 @@ class Panoptic(JointsDataset):
         meta['mean'] = mean
         meta['std'] = std
 
-        padding = self.window_size + 1
+        padding = int(self.window_size // self.token_window_size) + 1
         
-        return (data, gt, mask, meta, padding)
+        return (data, gt, mixed, mask, meta, padding)
 
     def __len__(self):
         return self.vf_size
