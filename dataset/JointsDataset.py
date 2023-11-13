@@ -33,7 +33,9 @@ class JointsDataset(Dataset):
         self.root_id = cfg.DATASET.rootIDX
         self.image_set = image_set
         self.dataset_name = cfg.DATASET.test_dataset
+        self.frame_interval = cfg.DATASET.frame_interval
         self.window_size = cfg.DATASET.window_size
+        self.total_window = self.window_size * self.frame_interval
         self.stride = cfg.DATASET.stride
 
         self.mask_chance = cfg.DATASET.mask_chance

@@ -24,8 +24,8 @@ class BERTTrainer:
     """
 
     def __init__(self, pert: BERT, pretrain, train_dataloader: DataLoader, test_dataloader: DataLoader = None,
-                 lr: float = 1e-4, betas=(0.9, 0.999), weight_decay: float = 0.01, warmup_steps=10000,
-                 with_cuda: bool = True, cuda_devices=None, log_freq: int = 1000):
+                 lr: float = 1e-4, betas=(0.9, 0.999), weight_decay: float = 0.01, warmup_steps=1500,
+                 with_cuda: bool = True, cuda_devices=None, log_freq: int = 5):
         """
         :param bert: BERT model which you want to train
         :param vocab_size: total word vocab size
@@ -104,6 +104,7 @@ class BERTTrainer:
             data, gt, mixed, mask, meta, num_frames = batch
             data = data.to(self.device)
             gt = gt.to(self.device)
+            mixed = torch.tensor([0.0, 1.0]).repeat(256, 1)
             mixed = mixed.to(self.device)
 
             # 1. forward the next_sentence_prediction and masked_lm model

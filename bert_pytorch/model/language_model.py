@@ -30,8 +30,6 @@ class PERT_Mask_Order(nn.Module):
     def forward(self, x, mask_tokens, padding=None):
 
         x = self.pert.emb(x)
-        x[mask_tokens] = 1.0
-        
         x = self.pert.pos(x)  # inject position info
 
         batch_size, seq_len, *_ = x.size()

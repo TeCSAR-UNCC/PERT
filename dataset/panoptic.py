@@ -288,7 +288,7 @@ class Panoptic(JointsDataset):
                 frames_from_end = 0
                 continue
 
-            if frames_from_end < self.window_size-1:
+            if frames_from_end < self.total_window-1:
                 continue
                 
             index = len(db)-i-1
@@ -373,31 +373,43 @@ class Panoptic(JointsDataset):
 
         return data
     
-    def _mix(self, data):
+    def _mix(self, data, type=1):
         length = data.shape[0]
 
         # Draw a random number to determine if this example should be mixed
         mixed = torch.rand(1).item() > self.mix_chance
 
         if mixed:
-            # Compute random index for the example
-            min_index = int(length * 0.1)
-            max_index = int(length * 0.9)
-            random_index = torch.randint(min_index, max_index, (1,)).item()
+            if type == 0:
+                # Compute random index for the example
+                min_index = int(length * 0.1)
+                max_index = int(length * 0.9)
+                random_index = torch.randint(min_index, max_index, (1,)).item()
 
-            # Apply rotation
-            mixed_data = torch.cat((data[random_index:], data[:random_index]), dim=0)
-            mixed = torch.eye(2)[0]
+                # Apply rotation
+                mixed_data = torch.cat((data[random_index:], data[:random_index]), dim=0)
+                mixed = torch.eye(2)[1]
 
-            return mixed_data, mixed
+                return mixed_data, mixed
+            elif type == 1:
+
+                # Reshape to make pairs of elements adjacent: (15, 2, 15, 2)
+                data = data.view(15, 2, 225, 2)
+                data[:, 0, :, :], data[:, 1, :, :] = data[:, 1, :, :].clone(), data[:, 0, :, :].clone()
+
+                # Reshape back to the original shape
+                mixed_data = data.view(30, 225, 2)
+                mixed = torch.eye(2)[1]
+
+                return mixed_data, mixed
         
         # If not mixed, just return the original data and zero for the shift index
-        mixed = torch.eye(2)[1]
+        mixed = torch.eye(2)[0]
         return data, mixed
 
     def __getitem__(self, idx):
-        idx = self.vf[idx]
-        data = self.db[idx:idx + self.window_size]
+        idx = self.vf[::self.stride][idx]
+        data = self.db[idx:idx + self.total_window][::self.frame_interval]
         data = self._filter_data(data)
         data, (mean, std) = self.normalize_pose(data)
         data = torch.from_numpy(data).float()
@@ -412,8 +424,9 @@ class Panoptic(JointsDataset):
         
         gt = data[mask].clone()
         gt = gt.view(-1, int(gt.shape[1] // self.token_window_size), gt.shape[2])
-        
-        meta = self.meta.iloc[idx:idx + self.window_size]
+        data[mask] = 1.0
+
+        meta = self.meta.iloc[idx:idx + self.total_window][::self.frame_interval]
         unq_videos = meta[['video', 'camera', 'id']].drop_duplicates()
 
         if len(unq_videos) > 1:
@@ -429,7 +442,7 @@ class Panoptic(JointsDataset):
         return (data, gt, mixed, mask, meta, padding)
 
     def __len__(self):
-        return self.vf_size
+        return self.vf_size // self.stride
 
 class KeypointsKalmanFilter:
     def __init__(self, n_keypoints, dt=1):

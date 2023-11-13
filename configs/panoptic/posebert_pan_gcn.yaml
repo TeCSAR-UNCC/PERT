@@ -3,45 +3,47 @@ output_dir: 'output'
 log_dir: 'log'
 num_workers: 32
 print_freq: 100
+token_window_size: &tws 15
 
 MODEL:
   out_kp: 15
   out_chns: 2
-  window: 10
-  depth: 4
+  window: *tws
+  depth: 8
   heads: 8
   embedding: 'GCNEncoder'
   EMB_ARGS:
     arch: [[2, 8], [8, 16]]
-    token_window_size: 10
+    token_window_size: *tws
     out_features: 64
 
 DATASET:
   train_dataset: 'panoptic'
   test_dataset: 'panoptic'
   root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-  window_size: 300
-  token_window_size: 10
+  window_size: 450
+  frame_interval: 2
+  token_window_size: *tws
   add_cls: True
   mix_chance: 0.5
-  mask_chance: 0.2
-  stride: 1
+  mask_chance: 0.3
+  stride: *tws
   test_subset: 'validation'
   train_subset: 'train'
   rootIDX: 1
   camera_num: 10
 
 TRAIN:
-  batch_size: 512
+  batch_size: 256
   shuffle: True
   end_epoch: 5
   resume: true
   optimizer: adam
   lr: 0.00001
-  num_workers: 24
+  num_workers: 16
 
 TEST:
-  batch_size: 256
+  batch_size: 128
   num_workers: 8
   
 DEBUG:
