@@ -22,6 +22,7 @@ from bert_pytorch import BERT, PoseBERT
 from bert_pytorch import BERTTrainer
 from dataset.shanghai import get_dataset_and_loader
 from utils.data_utils import trans_list
+from torch import nn
 import dataset
 from tqdm import tqdm
 
@@ -100,8 +101,8 @@ def main():
     pretrain = True
 
     trainer = BERTTrainer(PERT, pretrain, train_loader, test_loader)
-    trainer.model, start = load_latest_model(trainer.model)
-
+    # trainer.model, start = load_latest_model(trainer.model)
+    start = 0
     for epoch in range(start, config.TRAIN.end_epoch):
         trainer.train(epoch)
         trainer.save(epoch)

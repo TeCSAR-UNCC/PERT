@@ -4,6 +4,8 @@ log_dir: 'log'
 num_workers: 32
 print_freq: 100
 token_window_size: &tws 15
+# 0: No Mixing | 1:Mixing
+train_stage: 1
 
 MODEL:
   out_kp: 15
@@ -21,8 +23,8 @@ DATASET:
   train_dataset: 'panoptic'
   test_dataset: 'panoptic'
   root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-  window_size: 450
-  frame_interval: 2
+  window_size: 300
+  frame_interval: 1
   token_window_size: *tws
   add_cls: True
   mix_chance: 0.5
@@ -32,11 +34,12 @@ DATASET:
   train_subset: 'train'
   rootIDX: 1
   camera_num: 10
-
+LOSS:
+  USE_TARGET_WEIGHT: true
 TRAIN:
   batch_size: 256
   shuffle: True
-  end_epoch: 5
+  end_epoch: 10
   resume: true
   optimizer: adam
   lr: 0.00001

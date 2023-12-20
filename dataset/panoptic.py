@@ -242,14 +242,14 @@ class Panoptic(JointsDataset):
                         pose2d = np.delete(pose2d, [14, 15], axis=0)
                         pose2d = np.insert(pose2d, 1, head_kp, axis=0)
 
-                        if full_id not in prev_pose2d.keys():
-                            prev_pose2d[full_id] = copy.deepcopy(pose2d)
+                        # if full_id not in prev_pose2d.keys():
+                        #     prev_pose2d[full_id] = copy.deepcopy(pose2d)
 
-                        glitch_check = np.linalg.norm(pose2d - prev_pose2d[full_id], axis=1) > 100
-                        if glitch_check.any():
-                            pose2d[glitch_check] = copy.deepcopy(prev_pose2d[full_id][glitch_check])
+                        # glitch_check = np.linalg.norm(pose2d - prev_pose2d[full_id], axis=1) > 100
+                        # if glitch_check.any():
+                        #     pose2d[glitch_check] = copy.deepcopy(prev_pose2d[full_id][glitch_check])
                         
-                        prev_pose2d[full_id] = copy.deepcopy(pose2d)
+                        # prev_pose2d[full_id] = copy.deepcopy(pose2d)
 
                         if len(pose2d) > 0:
 
@@ -286,13 +286,12 @@ class Panoptic(JointsDataset):
                 video = new_frame
                 num_sep_videos += 1
                 frames_from_end = 0
-                continue
 
             if frames_from_end < self.total_window-1:
                 continue
                 
             index = len(db)-i-1
-            valid_frames.append(index)
+            valid_frames.append([index, self.total_window])
             
         valid_frames = np.array(valid_frames[::-1])
         skel_array = np.array([i['joints_2d'] for i in db])
@@ -320,126 +319,7 @@ class Panoptic(JointsDataset):
                 cameras[(cam['panel'], cam['node'])] = sel_cam
         return cameras
 
-    def _compute_velocity(self, keypoints, delta_t=1):
-    # keypoints is an array of shape (window, num_keypoints, 2)
-        velocities = np.zeros_like(keypoints)
-        
-        velocities[1:] = (keypoints[1:] - keypoints[:-1]) / delta_t
-
-        return velocities
-
-    def _filter_data(self, data):
-        filtered_data = np.zeros_like(data)
-        vel = self._compute_velocity(data)
-        data_vel = np.concatenate((data, vel), axis=2)
-
-        for i in range(self.window_size):
-            # Apply the Kalman Filter on the concatenated data and velocity
-            filtered_data[i] = self.kf_filter.apply(data_vel[i])[:, :2]
-
-        # First 10 unfiltered because idk whats wrong
-        return np.concatenate((data[:10], filtered_data[10:]), axis=0)
-
-    def _create_mask(self, window):
-        # Create the mask
-        masked_amount = int(window * self.mask_chance)
-        mask = torch.cat((torch.ones(masked_amount, dtype=torch.bool), 
-                        torch.zeros(window - masked_amount, dtype=torch.bool)))
-        mask = mask[torch.randperm(window)]
-        
-        if self.add_cls:
-            mask = torch.cat((torch.tensor([0], dtype=torch.bool), mask))
-
-        return mask
     
-    def _tokenize(self, data):
-        
-        window, keypoints, channels = data.shape
-
-        # Calculate the number of tokens in each window
-        tokens = int(window / self.token_window_size)
-
-        # Reshape input to process in tokens
-        data = data.view(tokens, self.token_window_size, keypoints, channels)
-        data = data.view(tokens, self.token_window_size * keypoints, channels)
-
-        return data
-    
-    def _class_token(self, data):
-        # Add class token to data
-        if self.add_cls:
-            cls_token = torch.ones_like(data[0]).unsqueeze(0) * -1
-            data = torch.cat((cls_token, data), dim=0).float()
-
-        return data
-    
-    def _mix(self, data, type=1):
-        length = data.shape[0]
-
-        # Draw a random number to determine if this example should be mixed
-        mixed = torch.rand(1).item() > self.mix_chance
-
-        if mixed:
-            if type == 0:
-                # Compute random index for the example
-                min_index = int(length * 0.1)
-                max_index = int(length * 0.9)
-                random_index = torch.randint(min_index, max_index, (1,)).item()
-
-                # Apply rotation
-                mixed_data = torch.cat((data[random_index:], data[:random_index]), dim=0)
-                mixed = torch.eye(2)[1]
-
-                return mixed_data, mixed
-            elif type == 1:
-
-                # Reshape to make pairs of elements adjacent: (15, 2, 15, 2)
-                data = data.view(15, 2, 225, 2)
-                data[:, 0, :, :], data[:, 1, :, :] = data[:, 1, :, :].clone(), data[:, 0, :, :].clone()
-
-                # Reshape back to the original shape
-                mixed_data = data.view(30, 225, 2)
-                mixed = torch.eye(2)[1]
-
-                return mixed_data, mixed
-        
-        # If not mixed, just return the original data and zero for the shift index
-        mixed = torch.eye(2)[0]
-        return data, mixed
-
-    def __getitem__(self, idx):
-        idx = self.vf[::self.stride][idx]
-        data = self.db[idx:idx + self.total_window][::self.frame_interval]
-        data = self._filter_data(data)
-        data, (mean, std) = self.normalize_pose(data)
-        data = torch.from_numpy(data).float()
-
-        data = self._tokenize(data)
-        mixed = torch.eye(2)[1]
-        if self.mix_chance > 0.0:
-            data, mixed = self._mix(data)
-
-        mask = self._create_mask(data.shape[0])
-        data = self._class_token(data)
-        
-        gt = data[mask].clone()
-        gt = gt.view(-1, int(gt.shape[1] // self.token_window_size), gt.shape[2])
-        data[mask] = 1.0
-
-        meta = self.meta.iloc[idx:idx + self.total_window][::self.frame_interval]
-        unq_videos = meta[['video', 'camera', 'id']].drop_duplicates()
-
-        if len(unq_videos) > 1:
-            print(meta)
-            raise Exception("Multiple videos in one segment")
-        
-        meta = self.meta.iloc[idx].to_dict()
-        meta['mean'] = mean
-        meta['std'] = std
-
-        padding = int(self.window_size // self.token_window_size) + 1
-        
-        return (data, gt, mixed, mask, meta, padding)
 
     def __len__(self):
         return self.vf_size // self.stride
@@ -471,3 +351,4 @@ class KeypointsKalmanFilter:
             filtered_data[i, 2:] = corrected[2:].ravel()
         
         return filtered_data
+    

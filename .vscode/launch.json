@@ -55,7 +55,7 @@
             "program": "bad_frames.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--cfg", "configs/panoptic/posebert_pan_fc.yaml"]
+            "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
         },
         {
             "name": "testing",

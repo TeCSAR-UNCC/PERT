@@ -215,10 +215,10 @@ class PoseBERT(nn.Module):
         x = self.pos(x)  # inject position info
 
         batch_size, seq_len, *_ = x.size()
-        # mask = None
-        mask = torch.arange(x.size(1), device=x.device)
-        mask = mask.expand(x.size(0), x.size(1)) 
-        mask = mask >= padding.unsqueeze(1)
+        mask = None
+        # mask = torch.arange(x.size(1), device=x.device)
+        # mask = mask.expand(x.size(0), x.size(1)) 
+        # mask = mask >= padding.unsqueeze(1)
 
         # Transformer
         init = [self.init_pose.repeat(batch_size, seq_len, 1)]  # init mean pose

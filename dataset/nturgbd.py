@@ -1,5 +1,6 @@
 import glob
 import torch
+import cv2
 import os.path as osp
 import numpy as np
 import json_tricks as json
@@ -59,6 +60,8 @@ class Nturgbd(JointsDataset):
         self.joint_indices = list(JOINTS_DEF.values())
         self.joint_req = 0.5
         # self.num_joints = len(JOINTS_DEF)
+        self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices)-1)
+        
 
         if self.image_set == 'train':
             self.sequence_list = TRAIN_LIST
@@ -109,6 +112,8 @@ class Nturgbd(JointsDataset):
             all_poses_3d = []
             frame = -1
             for pose2d in mat['rgb_body0']:
+                
+                pose2d = pose2d[self.joint_indices]
 
                 x_check = np.bitwise_and(pose2d[:, 0] >= 0, pose2d[:, 0] <= width - 1)
                 y_check = np.bitwise_and(pose2d[:, 1] >= 0, pose2d[:, 1] <= height - 1)
@@ -118,6 +123,9 @@ class Nturgbd(JointsDataset):
                 vis_perc = np.sum(joints_vis)/len(joints_vis)
 
                 if vis_perc <= self.joint_req:
+                    continue
+
+                if np.sum(pose2d) == 0.0:
                     continue
                 
                 frame += 1
@@ -148,25 +156,23 @@ class Nturgbd(JointsDataset):
                          'id':datapoint['id'],
                         }
             
-            # Check if we are at a new video
             frames_from_end += 1
+            # Check if we are at a new video
             if video != new_frame: 
                 video = new_frame
                 num_sep_videos += 1
 
-                if frames_from_end < self.window_size-1:
+                if frames_from_end < self.total_window-1:
                     index = len(db)-i
-
-                    # -1 Since we are on the frame after the video
-                    valid_frames.append([index, frames_from_end])
+                    valid_frames.append([int(index), int(frames_from_end)])
 
                 frames_from_end = 0
 
-            if frames_from_end < self.window_size-1:
+            if frames_from_end < self.total_window-1:
                 continue
                 
             index = len(db)-i-1
-            valid_frames.append([index, self.window_size])
+            valid_frames.append([int(index), int(self.total_window)])
             
             
         valid_frames = np.array(valid_frames[::-1])
@@ -235,52 +241,81 @@ class Nturgbd(JointsDataset):
                         del bodymat[f'rgb_body{each}']
                     if save_depthxy:
                         del bodymat[f'depth_body{each}']
+
         return bodymat
     
     def __len__(self):
-        return self.vf_size
+        return self.vf_size // self.stride
 
-    def __getitem__(self, idx):
-        idx, num_frames = self.vf[idx]
+    # def __getitem__(self, idx):
+    #     idx, num_frames = self.vf[idx]
 
-        idx, num_frames = int(idx), int(num_frames)
-        data = torch.from_numpy(self.db[idx:idx + num_frames])
-        data = data[:, self.joint_indices]
-        data = torch.nan_to_num(data, nan=0.0)
-        data = self.normalize(data)
-
-        # Add zero padding
-        data = torch.cat((data, torch.zeros((self.window_size - num_frames, *data.shape[1:]))))
+    #     data = torch.from_numpy(self.db[idx:idx + num_frames])
         
-        # Create the mask
-        masked_amount = int(data.shape[0] * self.mask_chance)
-        mask = torch.cat((torch.ones(masked_amount, dtype=torch.bool), 
-                        torch.zeros(data.shape[0] - masked_amount, dtype=torch.bool)))
-        mask = mask[torch.randperm(data.shape[0])]
-        mask = torch.cat((torch.tensor([0], dtype=torch.bool), mask))
+    #     data = torch.nan_to_num(data, nan=0.0)
+    #     data = self.normalize(data)
+
+    #     # Add zero padding
+    #     data = torch.cat((data, torch.zeros((self.window_size - num_frames, *data.shape[1:]))))
+        
+    #     # Create the mask
+    #     masked_amount = int(data.shape[0] * self.mask_chance)
+    #     mask = torch.cat((torch.ones(masked_amount, dtype=torch.bool), 
+    #                     torch.zeros(data.shape[0] - masked_amount, dtype=torch.bool)))
+    #     mask = mask[torch.randperm(data.shape[0])]
+    #     mask = torch.cat((torch.tensor([0], dtype=torch.bool), mask))
         
 
-        # Get indices of True values directly using PyTorch
-        indices = torch.nonzero(mask).squeeze().tolist()
+    #     # Get indices of True values directly using PyTorch
+    #     indices = torch.nonzero(mask).squeeze().tolist()
 
-        # Add class token to data
-        cls_token = torch.ones_like(data[0]).unsqueeze(0) * -1
-        data = torch.cat((cls_token, data), dim=0)
-        data = data.view(data.shape[0], -1).float()
+    #     # Add class token to data
+    #     cls_token = torch.ones_like(data[0]).unsqueeze(0) * -1
+    #     data = torch.cat((cls_token, data), dim=0)
+    #     data = data.view(data.shape[0], -1).float()
 
-        # Create a copy of data at specified indices for gt
-        gt = data[indices].clone()
+    #     # Create a copy of data at specified indices for gt
+    #     gt = data[indices].clone()
 
-        # Mask the data tensor
-        data[mask] = 1.0
+    #     # Mask the data tensor
+    #     data[mask] = 1.0
         
-        meta = self.meta.iloc[idx:idx + num_frames]
-        unq_videos = meta[['video', 'id']].drop_duplicates()
+    #     meta = self.meta.iloc[idx:idx + num_frames]
+    #     unq_videos = meta[['video', 'id']].drop_duplicates()
 
-        if len(unq_videos) > 1:
-            print(meta)
-            raise Exception("Multiple videos in one segment")
+    #     if len(unq_videos) > 1:
+    #         print(meta)
+    #         raise Exception("Multiple videos in one segment")
         
-        cls = int(unq_videos.values[0, 0][-3:])
+    #     cls = int(unq_videos.values[0, 0][-3:])
         
-        return (data, gt, mask, cls, num_frames+1)
+    #     return (data, gt, mask, cls, num_frames+1)
+
+
+class KeypointsKalmanFilter:
+    def __init__(self, n_keypoints, dt=1):
+        self.n_keypoints = n_keypoints
+        self.filters = [self._create_kalman_filter(dt) for _ in range(n_keypoints)]
+
+    @staticmethod
+    def _create_kalman_filter(dt):
+        kf = cv2.KalmanFilter(4, 2)
+        kf.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], np.float32)
+        kf.transitionMatrix = np.array([[1, 0, dt, 0], [0, 1, 0, dt], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
+        kf.processNoiseCov = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32) * 1e-2
+        kf.measurementNoiseCov = np.array([[1, 0], [0, 1]], np.float32) * 1e-1
+        return kf
+
+    def apply(self, keypoints):
+        # Initialize filtered keypoints and velocities with zeros
+        filtered_data = np.zeros_like(keypoints)
+        
+        for i, kf in enumerate(self.filters):
+            prediction = kf.predict()
+            measurement = np.array(keypoints[i, :2], dtype=np.float32).reshape(2, 1)
+            corrected = kf.correct(measurement)
+            # Fill in both the position and velocity parts of the output
+            filtered_data[i, :2] = corrected[:2].ravel()
+            filtered_data[i, 2:] = corrected[2:].ravel()
+        
+        return filtered_data

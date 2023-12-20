@@ -1,13 +1,18 @@
 import torch
+import os
 import torch.nn as nn
 import numpy as np
 from torch.optim import Adam
 import torchmetrics
 from torch.utils.data import DataLoader
+from bert_pytorch.model.language_model import ClassificationModel
+
 # from memory_profiler import profile
 
 from ..model import PERT_Mask_Order, BERT
 from .optim_schedule import ScheduledOptim
+from utils.loss_functions import combined_evaluation
+import re
 
 import tqdm
 
@@ -24,8 +29,8 @@ class BERTTrainer:
     """
 
     def __init__(self, pert: BERT, pretrain, train_dataloader: DataLoader, test_dataloader: DataLoader = None,
-                 lr: float = 1e-4, betas=(0.9, 0.999), weight_decay: float = 0.01, warmup_steps=1500,
-                 with_cuda: bool = True, cuda_devices=None, log_freq: int = 5):
+                 lr: float = 1e-4, betas=(0.9, 0.999), weight_decay: float = 0.01, warmup_steps=15000,
+                 with_cuda: bool = True, cuda_devices=None, log_freq: int = 50):
         """
         :param bert: BERT model which you want to train
         :param vocab_size: total word vocab size
@@ -45,8 +50,11 @@ class BERTTrainer:
         # This BERT model will be saved every epoch
         # self.pert = pert
         # Initialize the BERT Language Model, with BERT model
-        self.token_window_size = train_dataloader.dataset.token_window_size
+        self.token_window_size = 15
         self.model =  PERT_Mask_Order(pert, self.token_window_size, num_cls=2).to(self.device)# pert.to(self.device) # 
+
+        self.model, start = load_latest_model(self.model)
+        # self.model.classification = ClassificationModel(450, 120).to(self.device)
 
         # Distributed GPU training if CUDA can detect more than 1 GPU
         if with_cuda and torch.cuda.device_count() > 1:
@@ -62,7 +70,8 @@ class BERTTrainer:
         self.optim_schedule = ScheduledOptim(self.optim, 512, n_warmup_steps=warmup_steps)# len(train_dataloader)*10)
 
         # Using Negative Log Likelihood Loss function for predicting the masked_token
-        self.criterion = nn.MSELoss(reduction='none')
+        self.criterion = combined_evaluation
+        self.mse = nn.MSELoss(reduction='none')
         self.criterion_cls = nn.CrossEntropyLoss()
 
         self.log_freq = log_freq
@@ -94,6 +103,7 @@ class BERTTrainer:
                               total=len(data_loader),
                               bar_format="{l_bar}{r_bar}")
                               
+        unnorm_loss = 0.0
         avg_loss = 0.0
         cls_loss = 0.0
         acc = 0.0
@@ -102,9 +112,10 @@ class BERTTrainer:
         for i, batch in data_iter:
             # 0. batch_data will be sent into the device(GPU or cpu)
             data, gt, mixed, mask, meta, num_frames = batch
+            
             data = data.to(self.device)
             gt = gt.to(self.device)
-            mixed = torch.tensor([0.0, 1.0]).repeat(256, 1)
+            # mixed = torch.tensor([0.0, 1.0]).repeat(256, 1)
             mixed = mixed.to(self.device)
 
             # 1. forward the next_sentence_prediction and masked_lm model
@@ -113,20 +124,20 @@ class BERTTrainer:
             # 2-1. NLLLoss of predicting masked token word
             # Mask loss now
             mask_loss = self.criterion(mask_output, gt)
-            zero_pad = gt.sum(dim=-1) != 0
+            zero_pad = gt.sum(dim=[2, 3, 4]) != 0
             mask_loss = mask_loss[zero_pad].mean()
 
-            class_loss = self.criterion(mixed_output, mixed).mean()
-
+            class_loss = self.mse(mixed_output, mixed).mean()
+ 
             pred_classes = torch.argmax(mixed_output, dim=1)
             mixed = torch.argmax(mixed, dim=1)
             accuracy_metric.update(pred_classes, mixed)
             acc = accuracy_metric.compute().item()
 
             # 2-3. Adding next_loss and mask_loss : 3.4 Pre-training Procedure
-            loss = mask_loss + class_loss
+            loss = mask_loss + 10*class_loss
 
-            unnorm_mask_loss = self._unnorm_loss(mask_output, gt, mask, meta)
+            unnorm_mask_loss = self._unnorm_loss(mask_output, gt, meta)
 
             # 3. backward and optimization only in train
             if train:
@@ -134,12 +145,14 @@ class BERTTrainer:
                 loss.backward()
                 self.optim_schedule.step_and_update_lr()
 
+            unnorm_loss += loss.item()
             avg_loss += unnorm_mask_loss.item()**(1/2)
             cls_loss += class_loss.item()**(1/2)
 
             post_fix = {
                 "epoch": epoch,
                 "iter": i,
+                "unnorm_loss": (unnorm_loss/ (i + 1)),
                 "avg_loss": (avg_loss / (i + 1)),
                 "class_loss": (cls_loss / (i + 1)),
                 "class_acc": acc,
@@ -148,7 +161,7 @@ class BERTTrainer:
             if i % self.log_freq == 0:
                 data_iter.write(str(post_fix))
 
-        print("EP%d_%s, avg_loss=" % (epoch, str_code), 
+        print("\n\nEP%d_%s, avg_loss=" % (epoch, str_code), 
               f"cls_loss= {(avg_loss / len(data_iter))}", 
               f"cls_loss= {(cls_loss / len(data_iter))}", 
               f"cls_acc= {accuracy_metric.compute().item()}")
@@ -162,25 +175,43 @@ class BERTTrainer:
         :return: final_output_path
         """
         output_path = file_path + f".ep{epoch}{self.pretrain}"
-        torch.save(self.model.state_dict(), output_path)
+        torch.save(self.model.module.state_dict(), output_path)
         print("EP:%d Model Saved on:" % epoch, output_path)
         return output_path
 
-    def _unnorm_loss(self, mask_output, gt, mask, meta):
-        fea_mask = mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, 1, 2)
-        if self.train_data.dataset.add_cls:
-            fea_mask = fea_mask[:, 1:]
+    def _unnorm_loss(self, mask_output, gt, meta):
 
-        if self.token_window_size > 1:
-            fea_mask = fea_mask.repeat_interleave(self.token_window_size, dim=1)
+        unnorm_pred = self.train_data.dataset.unnormalize_pose(mask_output, meta)
+        unnorm_gt = self.train_data.dataset.unnormalize_pose(gt, meta)
 
-        features = (meta['mean'][fea_mask].view(*gt.shape[:2], 1, 2), 
-                    meta['std'][fea_mask].view(*gt.shape[:2], 1, 2))
-        unnorm_pred = self.train_data.dataset.unnormalize_pose(mask_output, features)
-        unnorm_gt = self.train_data.dataset.unnormalize_pose(gt, features)
-
-        unnorm_mask_loss = self.criterion(unnorm_pred, unnorm_gt)
+        unnorm_mask_loss = self.mse(unnorm_pred, unnorm_gt)
         zero_pad = gt.sum(dim=-1) != 0
         unnorm_mask_loss = unnorm_mask_loss[zero_pad].mean()
 
         return unnorm_mask_loss
+    
+
+def load_latest_model(model, directory='./output'):
+    # List all files in the directory
+    files = os.listdir(directory)
+
+    # Get the full path for each model file
+    model_paths = [os.path.join(directory, f) for f in files if os.path.isfile(os.path.join(directory, f))]
+    
+    # If there are no model files, do nothing
+    if not model_paths:
+        print('No models found.')
+        return model, 0
+    
+    # Sort the model files by modification time
+    model_paths.sort(key=os.path.getmtime, reverse=True)
+    
+    # The latest model is the first one in the sorted list
+    latest_model_path = model_paths[0]
+    
+    # Load the latest model
+    model.load_state_dict(torch.load(latest_model_path))
+
+    epoch_number = int(re.findall(r'\d+', latest_model_path)[-1])+1
+
+    return model, epoch_number

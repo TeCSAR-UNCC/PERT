@@ -1,34 +1,51 @@
-GPUS: '0'
-OUTPUT_DIR: 'output'
-LOG_DIR: 'log'
-WORKERS: 32
-PRINT_FREQ: 100
+gpus: '0'
+output_dir: 'output'
+log_dir: 'log'
+num_workers: 32
+print_freq: 100
+token_window_size: &tws 15
+train_stage: 2 # Only stage 2
 
 MODEL:
-  hidden: 30
-  attn_heads: 5
-  n_layers: 8
+  out_kp: 15
+  out_chns: 2
+  window: *tws
+  depth: 8
+  heads: 8
+  embedding: 'GCNEncoder'
+  EMB_ARGS:
+    arch: [[2, 8], [8, 16]]
+    token_window_size: *tws
+    out_features: 64
 
 DATASET:
-  TRAIN_DATASET: 'nturgbd'
-  TEST_DATASET: 'nturgbd'
-  ROOT: '/mnt/DATASETS_RAID_28TB/nturgbd/'
-  WINDOW_SIZE: 300
-  STRIDE: 1
-  TEST_SUBSET: 'validation'
-  TRAIN_SUBSET: 'train'
-  ROOTIDX: 2
-  CAMERA_NUM: 10
+  train_dataset: 'nturgbd'
+  test_dataset: 'nturgbd'
+  root: '/mnt/DATASETS_RAID_28TB/nturgbd/'
+  window_size: 300
+  frame_interval: 1
+  token_window_size: *tws
+  add_cls: True
+  mix_chance: 0.0
+  mask_chance: 0.3
+  stride: 1
+  test_subset: 'validation'
+  train_subset: 'train'
+  rootIDX: 1
+  camera_num: 10
 LOSS:
   USE_TARGET_WEIGHT: true
 TRAIN:
-  BATCH_SIZE: 256
-  SHUFFLE: True
-  END_EPOCH: 30
-  RESUME: true
-  OPTIMIZER: adam
-  LR: 0.00001
+  batch_size: 8
+  shuffle: True
+  end_epoch: 15
+  resume: true
+  optimizer: adam
+  lr: 0.00001
+  num_workers: 4
 TEST:
-  BATCH_SIZE: 128
+  batch_size: 8
+  num_workers: 2
+
 DEBUG:
   DEBUG: true

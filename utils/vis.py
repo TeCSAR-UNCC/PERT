@@ -21,14 +21,23 @@ def view_skeleton_batch(batch, PATH="", NAME=""):
     out = cv2.VideoWriter(PATH + f'skeletons{NAME}.mp4', fourcc, 30.0, (1920, 1080))
 
     # Loop through all skeletons in the first batch
-    for skeleton_data in tqdm(batch):
-        fig, ax = plt.subplots(figsize=(19.2, 10.8))  # 1920x1080 resolution in inches (DPI default is 100)
+    # for skeleton_data1, skeleton_data2 in tqdm(zip(batches[0], batches[1])):
+
+    for skeleton_data1, skeleton_data2 in tqdm(zip(batch[0], batch[1])):
+        fig, ax = plt.subplots(figsize=(19.2, 10.8))
 
         for pair in JOINTS_PAIRS:
-            x1, y1 = skeleton_data[JOINTS_DEF[pair[0]]].cpu().numpy()
-            x2, y2 = skeleton_data[JOINTS_DEF[pair[1]]].cpu().numpy()
+            x1, y1 = skeleton_data1[JOINTS_DEF[pair[0]]].cpu().numpy()
+            x2, y2 = skeleton_data1[JOINTS_DEF[pair[1]]].cpu().numpy()
 
             ax.plot([x1, x2], [y1, y2], 'ro-')
+            ax.annotate(pair[0], (x1, y1))
+            ax.annotate(pair[1], (x2, y2))
+
+            x1, y1 = skeleton_data2[JOINTS_DEF[pair[0]]].cpu().numpy()
+            x2, y2 = skeleton_data2[JOINTS_DEF[pair[1]]].cpu().numpy()
+
+            ax.plot([x1, x2], [y1, y2], 'go-')
             ax.annotate(pair[0], (x1, y1))
             ax.annotate(pair[1], (x2, y2))
 
