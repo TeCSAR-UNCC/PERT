@@ -61,7 +61,7 @@
             "name": "Heatmap generator",
             "type": "python",
             "request": "launch",
-            "program": "heatmap_generator.py",
+            "program": "testing_things.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]

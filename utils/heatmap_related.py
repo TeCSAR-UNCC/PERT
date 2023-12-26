@@ -4,7 +4,7 @@ import numpy as np
 EPS = 1e-3
 
 
-class  GeneratePoseTarget:
+class GeneratePoseTarget:
     """Generate pseudo heatmaps based on joint coordinates and confidence.
 
     Required keys are "keypoint", "img_shape", "keypoint_score" (optional),

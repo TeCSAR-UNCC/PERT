@@ -25,6 +25,7 @@ class JointsDataset(Dataset):
         self.pixel_std = 200
         self.flip_pairs = []
         self.norm = [1920, 1080]
+        self.heatmap_size = (100, 100)
 
         self.is_train = is_train
 
@@ -50,16 +51,95 @@ class JointsDataset(Dataset):
         self.db = []
         self.cls_token = False
 
-    def normalize(self, data):
-        pose_center = data[:, 2].mean(0, keepdims=True)
-        data = data - pose_center
-        data = data / self.norm.to(data.device)
-        data = data + torch.Tensor([0.5, 0.5], device=data.device)
-        return data
+    def generate_a_heatmap(self, arr, centers, max_values):
+        """Generate pseudo heatmap for one keypoint in one frame.
 
-    def unnormalize(self, data):
-        data = data * self.norm.to(data.device)
-        return data
+        Args:
+            arr (np.ndarray): The array to store the generated heatmaps. Shape: img_h * img_w.
+            centers (np.ndarray): The coordinates of corresponding keypoints (of multiple persons). Shape: M * 2.
+            max_values (np.ndarray): The max values of each keypoint. Shape: M.
+
+        Returns:
+            np.ndarray: The generated pseudo heatmap.
+        """
+        EPS = 1e-3
+        sigma = 0.6
+        img_h, img_w = arr.shape
+
+        for center, max_value in zip(centers, max_values):
+            if max_value < EPS:
+                continue
+
+            mu_x, mu_y = center[0], center[1]
+            st_x = max(int(mu_x - 3 * sigma), 0)
+            ed_x = min(int(mu_x + 3 * sigma) + 1, img_w)
+            st_y = max(int(mu_y - 3 * sigma), 0)
+            ed_y = min(int(mu_y + 3 * sigma) + 1, img_h)
+            x = np.arange(st_x, ed_x, 1, np.float32)
+            y = np.arange(st_y, ed_y, 1, np.float32)
+
+            # if the keypoint not in the heatmap coordinate system
+            if not (len(x) and len(y)):
+                continue
+            y = y[:, None]
+
+            patch = np.exp(-((x - mu_x)**2 + (y - mu_y)**2) / 2 / sigma**2)
+            patch = patch * max_value
+            arr[st_y:ed_y, st_x:ed_x] = np.maximum(arr[st_y:ed_y, st_x:ed_x], patch)
+
+    def generate_heatmap(self, kps):
+        """Generate pseudo heatmap for all keypoints and limbs in one frame (if
+        needed).
+
+        Args:
+            arr (np.ndarray): The array to store the generated heatmaps. Shape: kps * img_h * img_w.
+            kps (np.ndarray): The coordinates of keypoints in this frame. Shape: 1 * kps * 2.
+            max_values (np.ndarray): The confidence score of each keypoint. Shape: M * V.
+
+        Returns:
+            np.ndarray: The generated pseudo heatmap.
+        """
+        num_kp = kps.shape[0]
+        kps = np.expand_dims(kps, axis=0)
+        arr = np.zeros([num_kp, 1080, 1920], dtype=np.float32)
+        max_values = np.ones([1, num_kp])
+        for i in range(num_kp):
+            self.generate_a_heatmap(arr[i], kps[:, i], max_values[:, i])
+        
+        combined_heatmaps = arr.max(axis=0)
+        
+        # Assuming kps is your keypoints array of shape (15, 2)
+        min_x, min_y = np.min(kps[0], axis=0)
+        max_x, max_y = np.max(kps[0], axis=0)
+
+        # Add some padding around the keypoints to ensure no information is lost
+        padding = 10  # You can adjust the padding as needed
+        min_x = max(int(min_x) - padding, 0)
+        min_y = max(int(min_y) - padding, 0)
+        max_x = min(int(max_x) + padding, combined_heatmaps.shape[1])
+        max_y = min(int(max_y) + padding, combined_heatmaps.shape[0])
+        cropped_heatmap = combined_heatmaps[min_y:max_y, min_x:max_x]
+        
+        desired_height, desired_width = max(cropped_heatmap.shape), max(cropped_heatmap.shape)
+
+        # Current dimensions of the cropped_heatmap
+        current_height, current_width = cropped_heatmap.shape
+
+        # Calculate padding
+        delta_width = max(desired_width - current_width, 0)
+        delta_height = max(desired_height - current_height, 0)
+
+        padding_top = delta_height // 2
+        padding_bottom = delta_height - padding_top
+        padding_left = delta_width // 2
+        padding_right = delta_width - padding_left
+
+        # Add padding
+        padded_heatmap = np.pad(cropped_heatmap, ((padding_top, padding_bottom), (padding_left, padding_right)), 'constant')
+
+        resized_heatmap = cv2.resize(padded_heatmap, self.heatmap_size)
+        
+        return resized_heatmap
 
     def normalize_pose(self, pose_data):
         """
@@ -233,47 +313,49 @@ class JointsDataset(Dataset):
 
         return data
     
-    def __getitem__(self, index): # Buggy NTU 3139Tr, 3150 Te
+    def __getitem__(self, index): 
         idx, num_frames = self.vf[::self.stride][index]
         data = self.db[idx:idx + num_frames][::self.frame_interval]
         data = np.nan_to_num(data, nan=1.0)
 
         data = self._filter_data(data)
-        data, mixed = self._mix(data)
-        data, (mean, std) = self.normalize_pose(data)
+
+        # data, mixed = self._mix(data)
+        # data, (mean, std) = self.normalize_pose(data)
 
         # Add zero padding
-        prev_length = data.shape[0]
-        padding = torch.zeros((self.window_size - prev_length, *data.shape[1:]))
-        data = torch.cat((data, padding))
+        # prev_length = data.shape[0]
+        # padding = torch.zeros((self.window_size - prev_length, *data.shape[1:]))
+        # data = torch.cat((data, padding))
 
-        data = self._tokenize(data)
+        # data = self._tokenize(data)
 
-        mask = self._create_mask(data.shape[0])
-        data = self._class_token(data)
+        # mask = self._create_mask(data.shape[0])
+        # data = self._class_token(data)
         
-        gt = data[mask].clone()
+        # gt = data[mask].clone()
 
-        gt = gt.view(gt.shape[0], self.token_window_size, -1, gt.shape[-1])
-        data[mask] = 1.0
+        # gt = gt.view(gt.shape[0], self.token_window_size, -1, gt.shape[-1])
+        # data[mask] = 1.0
 
-        meta = self.meta.iloc[idx:idx + num_frames][::self.frame_interval]
-        unq_videos = meta[meta.columns[meta.columns != 'frame']].drop_duplicates()
+        # meta = self.meta.iloc[idx:idx + num_frames][::self.frame_interval]
+        # unq_videos = meta[meta.columns[meta.columns != 'frame']].drop_duplicates()
 
-        if len(unq_videos) > 1:
-            print(meta)
-            raise Exception("Multiple videos in one segment")
+        # if len(unq_videos) > 1:
+        #     print(meta)
+        #     raise Exception("Multiple videos in one segment")
         
-        meta = self.meta.iloc[idx].to_dict()
-        meta['mean'] = mean
-        meta['std'] = std
+        # meta = self.meta.iloc[idx].to_dict()
+        # meta['mean'] = mean
+        # meta['std'] = std
 
-        special_tokens = [bool(self.mix_chance), self.add_cls]
-        additional_tokens = len(torch.tensor([0, 0])[special_tokens])
-        padding = math.ceil(prev_length / self.token_window_size) + additional_tokens
+        # special_tokens = [bool(self.mix_chance), self.add_cls]
+        # additional_tokens = len(torch.tensor([0, 0])[special_tokens])
+        # padding = math.ceil(prev_length / self.token_window_size) + additional_tokens
 
-        if self.stage == 2:
-            mixed = int(unq_videos.values[0, 0][-3:])
-            mixed = torch.eye(120)[mixed-1]
+        # if self.stage == 2:
+        #     mixed = int(unq_videos.values[0, 0][-3:])
+        #     mixed = torch.eye(120)[mixed-1]
         
+        return data
         return (data, gt, mixed, mask, meta, padding)
