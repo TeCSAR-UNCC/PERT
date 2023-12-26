@@ -35,37 +35,37 @@ TRAIN_LIST = [
     '170221_haggling_m2',
     '170221_haggling_m3',
     '170224_haggling_a2',
-    '170224_haggling_a3',
-    '170224_haggling_b1',
-    '170224_haggling_b2',
-    '170224_haggling_b3',
-    '170228_haggling_a1',
-    '170228_haggling_a2',
-    '170228_haggling_b1',
-    '170228_haggling_b2',
-    '170228_haggling_b3',
-    '170404_haggling_a1',
-    '170404_haggling_a3',
-    '170404_haggling_b1',
-    '170404_haggling_b2',
-    '170404_haggling_b3',
-    '170407_haggling_a2',
-    '170407_haggling_a3',
-    '170407_haggling_b1',
-    '170407_haggling_b2',
-    '160422_ultimatum1',
-    '160906_band1',
-    '160906_band2',
-    '160906_ian2',
-    '160906_ian3',
-    '160906_ian5',
-    '160906_pizza1',
-    '161029_flute1',
-    '161029_piano1',
-    '161029_piano2',
-    '161029_piano4',
-    '170307_dance5',
-    '170407_office2',
+    # '170224_haggling_a3',
+    # '170224_haggling_b1',
+    # '170224_haggling_b2',
+    # '170224_haggling_b3',
+    # '170228_haggling_a1',
+    # '170228_haggling_a2',
+    # '170228_haggling_b1',
+    # '170228_haggling_b2',
+    # '170228_haggling_b3',
+    # '170404_haggling_a1',
+    # '170404_haggling_a3',
+    # '170404_haggling_b1',
+    # '170404_haggling_b2',
+    # '170404_haggling_b3',
+    # '170407_haggling_a2',
+    # '170407_haggling_a3',
+    # '170407_haggling_b1',
+    # '170407_haggling_b2',
+    # '160422_ultimatum1',
+    # '160906_band1',
+    # '160906_band2',
+    # '160906_ian2',
+    # '160906_ian3',
+    # '160906_ian5',
+    # '160906_pizza1',
+    # '161029_flute1',
+    # '161029_piano1',
+    # '161029_piano2',
+    # '161029_piano4',
+    # '170307_dance5',
+    # '170407_office2',
     '171026_cello3',
     '171026_pose1',
     '171026_pose3',
@@ -77,14 +77,14 @@ TRAIN_LIST = [
 ]
 
 VAL_LIST = [
-    '170407_haggling_b3',
-    '170407_haggling_a1',
-    '170404_haggling_a2',
-    '170228_haggling_a3',
-    '170224_haggling_a1',
-    '170221_haggling_b2',
-    '160422_haggling1',
-    '160906_band3',
+    # '170407_haggling_b3',
+    # '170407_haggling_a1',
+    # '170404_haggling_a2',
+    # '170228_haggling_a3',
+    # '170224_haggling_a1',
+    # '170221_haggling_b2',
+    # '160422_haggling1',
+    # '160906_band3',
     '160906_ian1',
     '161029_piano3',
     '170915_office1',
@@ -165,20 +165,22 @@ class Panoptic(JointsDataset):
             assert info['cam_list'] == self.cam_list
             self.vf = info['valid_frames']
             self.db = info['data']
+            self.hms = info['heatmap']
             self.meta = info['meta']
         else:
-            self.vf, self.db, self.meta, _ = self._get_db()
+            self.vf, self.db, self.hms, self.meta, _ = self._get_db()
             info = {
                 'sequence_list': self.sequence_list,
                 'interval': self._interval,
                 'cam_list': self.cam_list,
                 'valid_frames': self.vf,
                 'data': self.db,
+                'heatmap': self.hms,
                 'meta': self.meta,
             }
             pickle.dump(info, open(self.db_file, 'wb'))
         self.vf_size = len(self.vf)
-
+    
     def _get_db(self):
         width = 1920
         height = 1080
@@ -241,7 +243,10 @@ class Panoptic(JointsDataset):
                         head_kp = (pose2d[14] + pose2d[15])/2
                         pose2d = np.delete(pose2d, [14, 15], axis=0)
                         pose2d = np.insert(pose2d, 1, head_kp, axis=0)
-
+                        
+                        # Generate Heatmaps
+                        hm = self.generate_heatmap(copy.deepcopy(pose2d))
+                        
                         # if full_id not in prev_pose2d.keys():
                         #     prev_pose2d[full_id] = copy.deepcopy(pose2d)
 
@@ -257,6 +262,7 @@ class Panoptic(JointsDataset):
                                 'frame': postfix[1:-5],
                                 'video': seq,
                                 'joints_2d': pose2d,
+                                'heatmap': hm,
                                 'camera': prefix,
                                 'id': body['id']
                             })
@@ -295,10 +301,11 @@ class Panoptic(JointsDataset):
             
         valid_frames = np.array(valid_frames[::-1])
         skel_array = np.array([i['joints_2d'] for i in db])
+        hm_array = np.array([i['heatmap'] for i in db])
         meta_db = pd.DataFrame([{k: v for k, v in d.items() if k != 'joints_2d'} for d in db])
         unique_combinations = meta_db[['video', 'camera', 'id']].drop_duplicates()
 
-        return valid_frames, skel_array, meta_db, unique_combinations
+        return valid_frames, skel_array, hm_array, meta_db, unique_combinations
 
     def _get_cam(self, seq):
         cam_file = osp.join(self.dataset_root, seq, 'calibration_{:s}.json'.format(seq))
