@@ -18,19 +18,18 @@ logger = logging.getLogger(__name__)
 
 
 class JointsDataset(Dataset):
-
-    def __init__(self, cfg, image_set, is_train):
+    def __init__(self, cfg, image_set, is_train, heatmap_generator=None):
         self.cfg = cfg
         self.num_joints = 0
         self.pixel_std = 200
         self.flip_pairs = []
         self.norm = [1920, 1080]
-        self.heatmap_size = (100, 100)
+        self.heatmap_generator = heatmap_generator
 
         self.is_train = is_train
 
         this_dir = os.path.dirname(__file__)
-        dataset_root = os.path.join(this_dir, '../..', cfg.DATASET.root)
+        dataset_root = os.path.join(this_dir, "../..", cfg.DATASET.root)
         self.dataset_root = os.path.abspath(dataset_root)
         self.root_id = cfg.DATASET.rootIDX
         self.image_set = image_set
@@ -51,6 +50,7 @@ class JointsDataset(Dataset):
         self.db = []
         self.cls_token = False
 
+    # FIXME: Talk to gabrial about this.
     def generate_a_heatmap(self, arr, centers, max_values):
         """Generate pseudo heatmap for one keypoint in one frame.
 
@@ -83,10 +83,11 @@ class JointsDataset(Dataset):
                 continue
             y = y[:, None]
 
-            patch = np.exp(-((x - mu_x)**2 + (y - mu_y)**2) / 2 / sigma**2)
+            patch = np.exp(-((x - mu_x) ** 2 + (y - mu_y) ** 2) / 2 / sigma**2)
             patch = patch * max_value
             arr[st_y:ed_y, st_x:ed_x] = np.maximum(arr[st_y:ed_y, st_x:ed_x], patch)
 
+    # FIXME: Talk to gabrial about this.
     def generate_heatmap(self, kps):
         """Generate pseudo heatmap for all keypoints and limbs in one frame (if
         needed).
@@ -105,9 +106,9 @@ class JointsDataset(Dataset):
         max_values = np.ones([1, num_kp])
         for i in range(num_kp):
             self.generate_a_heatmap(arr[i], kps[:, i], max_values[:, i])
-        
+
         combined_heatmaps = arr.max(axis=0)
-        
+
         # Assuming kps is your keypoints array of shape (15, 2)
         min_x, min_y = np.min(kps[0], axis=0)
         max_x, max_y = np.max(kps[0], axis=0)
@@ -119,8 +120,10 @@ class JointsDataset(Dataset):
         max_x = min(int(max_x) + padding, combined_heatmaps.shape[1])
         max_y = min(int(max_y) + padding, combined_heatmaps.shape[0])
         cropped_heatmap = combined_heatmaps[min_y:max_y, min_x:max_x]
-        
-        desired_height, desired_width = max(cropped_heatmap.shape), max(cropped_heatmap.shape)
+
+        desired_height, desired_width = max(cropped_heatmap.shape), max(
+            cropped_heatmap.shape
+        )
 
         # Current dimensions of the cropped_heatmap
         current_height, current_width = cropped_heatmap.shape
@@ -135,10 +138,14 @@ class JointsDataset(Dataset):
         padding_right = delta_width - padding_left
 
         # Add padding
-        padded_heatmap = np.pad(cropped_heatmap, ((padding_top, padding_bottom), (padding_left, padding_right)), 'constant')
+        padded_heatmap = np.pad(
+            cropped_heatmap,
+            ((padding_top, padding_bottom), (padding_left, padding_right)),
+            "constant",
+        )
 
         resized_heatmap = cv2.resize(padded_heatmap, self.heatmap_size)
-        
+
         return resized_heatmap
 
     def normalize_pose(self, pose_data):
@@ -169,7 +176,7 @@ class JointsDataset(Dataset):
         std = torch.from_numpy(std).float()
 
         return pose_data_zero_mean, (mean, std)
-    
+
     def unnormalize_pose(self, pose_data_zero_mean, features):
         """
         unNormalize keypoint values from the range of [-1, 1]
@@ -182,7 +189,7 @@ class JointsDataset(Dataset):
             pose_data_zero_mean = pose_data_zero_mean[:, 1:]
 
         if isinstance(features, dict):
-            mean, std = features['mean'], features['std']
+            mean, std = features["mean"], features["std"]
         else:
             mean, std = features
 
@@ -206,9 +213,9 @@ class JointsDataset(Dataset):
         return pose_data
 
     def _compute_velocity(self, keypoints, delta_t=1):
-    # keypoints is an array of shape (window, num_keypoints, 2)
+        # keypoints is an array of shape (window, num_keypoints, 2)
         velocities = np.zeros_like(keypoints)
-        
+
         velocities[1:] = (keypoints[1:] - keypoints[:-1]) / delta_t
 
         return velocities
@@ -227,27 +234,30 @@ class JointsDataset(Dataset):
 
     def _create_mask(self, total_window):
         # Create the mask
-        rd_idx = total_window//(self.stage%2+1)
+        rd_idx = total_window // (self.stage % 2 + 1)
         masked_amount = int(rd_idx * self.mask_chance)
-        mask = torch.cat((
-                        torch.ones(masked_amount, dtype=torch.bool), 
-                        torch.zeros(rd_idx - masked_amount, dtype=torch.bool)
-                        ))
+        mask = torch.cat(
+            (
+                torch.ones(masked_amount, dtype=torch.bool),
+                torch.zeros(rd_idx - masked_amount, dtype=torch.bool),
+            )
+        )
         mask = mask[torch.randperm(rd_idx)]
         padding = torch.zeros(total_window - rd_idx, dtype=torch.bool)
         mask = torch.cat((mask, padding))
-        
+
         if self.mix_chance:
             half = rd_idx
-            mask = torch.cat((mask[:half], torch.tensor([0], dtype=torch.bool), mask[half:]))
-        
+            mask = torch.cat(
+                (mask[:half], torch.tensor([0], dtype=torch.bool), mask[half:])
+            )
+
         if self.add_cls:
             mask = torch.cat((torch.tensor([0], dtype=torch.bool), mask))
 
         return mask
-    
+
     def _tokenize(self, data, mean=None, std=None):
-        
         window, keypoints, channels = data.shape
 
         # Calculate the number of tokens in each window
@@ -255,12 +265,12 @@ class JointsDataset(Dataset):
 
         # Reshape input to process in tokens
         data = data.view(tokens, self.token_window_size, keypoints, channels)
-        data = data.view(tokens, self.token_window_size * keypoints, channels)            
+        data = data.view(tokens, self.token_window_size * keypoints, channels)
 
         return data
-    
+
     def _class_token(self, data):
-        rd_idx = int(data.shape[0]//2)
+        rd_idx = int(data.shape[0] // 2)
         if self.mix_chance:
             # half = int(data.shape[0] // 2)
             sep_token = torch.ones_like(data[0:1]) * 0.5
@@ -272,7 +282,7 @@ class JointsDataset(Dataset):
             data = torch.cat((cls_token, data), dim=0).float()
 
         return data
-    
+
     def _mix(self, data, type=0):
         length = data.shape[0]
 
@@ -287,38 +297,62 @@ class JointsDataset(Dataset):
 
                 mixed = torch.eye(2)[1]
                 return mixed_data, mixed
-            
+
             if type == 1:
                 # Compute random index for the example
-                min_index = int(length//self.token_window_size * 0.1)
-                max_index = int(length//self.token_window_size * 0.9)
+                min_index = int(length // self.token_window_size * 0.1)
+                max_index = int(length // self.token_window_size * 0.9)
                 random_index = torch.randint(min_index, max_index, (1,)).item()
 
-                mixed_data = data[:random_index*self.token_window_size]
-                random_data = self.__getrandom__()[random_index*self.token_window_size:]
+                mixed_data = data[: random_index * self.token_window_size]
+                random_data = self.__getrandom__()[
+                    random_index * self.token_window_size :
+                ]
                 mixed_data = np.concatenate((mixed_data, random_data), axis=0)
 
                 mixed = torch.eye(2)[1]
                 return mixed_data, mixed, random_index
-        
+
         # If not mixed, just return the original data and zero for the shift index
         mixed = torch.eye(2)[0]
         return data, mixed
-    
+
     def __getrandom__(self):
         index = int(torch.rand(1).item() * self.__len__())
-        idx, num_frames = self.vf[::self.stride][index]
-        data = self.db[idx:idx + self.total_window][::self.frame_interval]
+        idx, num_frames = self.vf[:: self.stride][index]
+        data = self.db[idx : idx + self.total_window][:: self.frame_interval]
         data = self._filter_data(data)
 
         return data
-    
-    def __getitem__(self, index): 
-        idx, num_frames = self.vf[::self.stride][index]
-        data = self.db[idx:idx + num_frames][::self.frame_interval]
+
+    def __getitem__(self, index):
+        idx, num_frames = self.vf[:: self.stride][index]
+        data = self.db[idx : idx + num_frames][:: self.frame_interval]
         data = np.nan_to_num(data, nan=1.0)
 
         data = self._filter_data(data)
+
+        # Select random sequence of frames
+        start_idx = 0
+        if num_frames > self.window_size:
+            start_idx = np.random.randint(
+                0, high=num_frames - self.window_size, size=1
+            )[0]
+        elif num_frames < self.window_size:
+            pad_size = ((0, self.window_size - num_frames), (0, 0), (0, 0))
+            data = np.pad(data, pad_size, "constant", 0)
+
+        data = data[start_idx : start_idx + self.window_size]
+
+        if self.heatmap_generator is not None:
+            results = {
+                "keypoint": np.expand_dims(data, axis=0),
+                "img_shape": (self.norm[1], self.norm[0]),
+            }
+
+            heatmaps = self.heatmap_generator(results)
+            combined_heatmaps = heatmaps["imgs"].max(axis=1)  # Shape: (300, 100, 100)
+            data = combined_heatmaps
 
         # data, mixed = self._mix(data)
         # data, (mean, std) = self.normalize_pose(data)
@@ -332,7 +366,7 @@ class JointsDataset(Dataset):
 
         # mask = self._create_mask(data.shape[0])
         # data = self._class_token(data)
-        
+
         # gt = data[mask].clone()
 
         # gt = gt.view(gt.shape[0], self.token_window_size, -1, gt.shape[-1])
@@ -344,7 +378,7 @@ class JointsDataset(Dataset):
         # if len(unq_videos) > 1:
         #     print(meta)
         #     raise Exception("Multiple videos in one segment")
-        
+
         # meta = self.meta.iloc[idx].to_dict()
         # meta['mean'] = mean
         # meta['std'] = std
@@ -356,6 +390,6 @@ class JointsDataset(Dataset):
         # if self.stage == 2:
         #     mixed = int(unq_videos.values[0, 0][-3:])
         #     mixed = torch.eye(120)[mixed-1]
-        
+
         return data
         return (data, gt, mixed, mask, meta, padding)

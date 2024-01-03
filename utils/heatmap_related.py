@@ -1,5 +1,8 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import numpy as np
+import imgaug as ia
+import imgaug.augmenters as iaa
+from imgaug.augmentables import Keypoint, KeypointsOnImage
 
 EPS = 1e-3
 
@@ -39,8 +42,11 @@ class GeneratePoseTarget:
     """
 
     def __init__(self,
-                 sigma=0.6,
+                 sigma=1.0,
                  use_score=False,
+                 use_gaussian_score=False,
+                 mean_gaussian_score=0.65,
+                 scale_gaussian_score=0.16,
                  with_kp=True,
                  with_limb=False,
                  skeletons=((0, 1), (0, 2), (0, 3), (3, 4), (4, 5), (0, 9), 
@@ -52,13 +58,18 @@ class GeneratePoseTarget:
                  # Not sure what to do with the limbs
                  left_limb=(3, 4, 5, 6, 7, 8),
                  right_limb=(9, 10, 11, 12, 13, 14),
+                 heat_map_size=256,
                  scaling=1.):
 
         self.sigma = sigma
         self.use_score = use_score
+        self.use_gaussian_score=use_gaussian_score,
+        self.mean_gaussian_score=mean_gaussian_score,
+        self.scale_gaussian_score = scale_gaussian_score,
         self.with_kp = with_kp
         self.with_limb = with_limb
         self.double = double
+        self.heat_map_size = heat_map_size
 
         assert self.with_kp + self.with_limb == 1, ('One of "with_limb" and "with_kp" should be set as True.')
         self.left_kp = left_kp
@@ -87,7 +98,7 @@ class GeneratePoseTarget:
             if max_value < EPS:
                 continue
 
-            mu_x, mu_y = center[0], center[1]
+            mu_x, mu_y = round(center[0]), round(center[1])
             st_x = max(int(mu_x - 3 * sigma), 0)
             ed_x = min(int(mu_x + 3 * sigma) + 1, img_w)
             st_y = max(int(mu_y - 3 * sigma), 0)
@@ -120,7 +131,6 @@ class GeneratePoseTarget:
 
         sigma = self.sigma
         img_h, img_w = arr.shape
-
         for start, end, start_value, end_value in zip(starts, ends, start_values, end_values):
             value_coeff = min(start_value, end_value)
             if value_coeff < EPS:
@@ -218,8 +228,13 @@ class GeneratePoseTarget:
         if self.use_score:
             all_kpscores = results['keypoint_score']
         else:
-            all_kpscores = np.ones(kp_shape[:-1], dtype=np.float32)
-
+            if self.use_gaussian_score:
+                all_kpscores =  np.random.normal(loc=self.mean_gaussian_score, scale=self.scale_gaussian_score, size=kp_shape[:-1])
+            else:
+                all_kpscores =  np.ones(kp_shape[:-1], dtype=np.float32)
+        
+        all_kpscores = np.clip(all_kpscores, 0, 1)
+        
         img_h, img_w = results['img_shape']
 
         # scale img_h, img_w and kps
@@ -227,21 +242,52 @@ class GeneratePoseTarget:
         img_w = int(img_w * self.scaling + 0.5)
         all_kps[..., :2] *= self.scaling
 
+
+        kps = [KeypointsOnImage([
+            Keypoint(x=x, y=y) for (y,x) in kps_per_image
+        ], shape=(img_h, img_w)) for kps_per_image in all_kps[0]]
+               
+        scale = {"height": self.heat_map_size, "width": "keep-aspect-ratio"} if (img_h > img_w) else {"width": self.heat_map_size, "height": "keep-aspect-ratio"}
+        
+        
+        seq = iaa.Sequential([
+            iaa.Resize(
+                scale
+            ),
+        ])
+        
+        
+        aug_kpt = seq(keypoints=kps)
+        
+        for i in range(0, len(aug_kpt)):
+            kp_on_image = aug_kpt[i]
+            for j in range(0, len(kp_on_image)):
+                kps = kp_on_image[j]
+                all_kps[0, i, j, :] = [kps.y, kps.x] 
+               
+               
         num_frame = kp_shape[1]
+        new_img_h, new_img_w = aug_kpt[0].shape
+        pad_width = (new_img_h == self.heat_map_size)
+        pad_size = (self.heat_map_size - new_img_w)//2 if pad_width else (self.heat_map_size - new_img_h)//2
         num_c = 0
         if self.with_kp:
             num_c += all_kps.shape[2]
         if self.with_limb:
             num_c += len(self.skeletons)
-        ret = np.zeros([num_frame, num_c, img_h, img_w], dtype=np.float32)
+        ret = np.zeros([num_frame, num_c, new_img_h, new_img_w], dtype=np.float32)
 
         for i in range(num_frame):
             # M, V, C
             kps = all_kps[:, i]
             # M, C
-            kpscores = all_kpscores[:, i] if self.use_score else np.ones_like(all_kpscores[:, i])
+            kpscores = all_kpscores[:, i]
 
             self.generate_heatmap(ret[i], kps, kpscores)
+        
+        pad_size_tuple = ((0,0), (0,0), (0,0), (pad_size, pad_size)) if pad_width else ((0,0), (0,0), (pad_size, pad_size), (0,0))
+        
+        ret = np.pad(ret, pad_size_tuple, 'constant', constant_values = 0 )
         return ret
 
     def __call__(self, results):

@@ -1,70 +1,79 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Python: Current File",
-            "type": "python",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "justMyCode": true
-        },
-        {
-            "name": "pert_train_ntu",
-            "type": "python",
-            "request": "launch",
-            "program": "train_2d.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "args": ["--cfg", "configs/panoptic/pert12_h5_ntu.yaml"]
-        },
-        {
-            "name": "poseBert_fc Train",
-            "type": "python",
-            "request": "launch",
-            "program": "train_2d.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "args": ["--cfg", "configs/panoptic/posebert_pan_fc.yaml"]
-        },
-        {
-            "name": "poseBert_emd Train",
-            "type": "python",
-            "request": "launch",
-            "program": "train_2d.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
-        },
-        {
-            "name": "pert_train_shang",
-            "type": "python",
-            "request": "launch",
-            "program": "train_2d.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "args": ["--cfg", "configs/panoptic/pert12_h5_shang.yaml"]
-        },
-        {
-            "name": "view_frames",
-            "type": "python",
-            "request": "launch",
-            "program": "bad_frames.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
-        },
-        {
-            "name": "Heatmap generator",
-            "type": "python",
-            "request": "launch",
-            "program": "testing_things.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
-        }
-    ]
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "pert_train_ntu",
+      "type": "python",
+      "request": "launch",
+      "program": "train_2d.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/panoptic/pert12_h5_ntu.yaml"]
+    },
+    {
+      "name": "poseBert_fc Train",
+      "type": "python",
+      "request": "launch",
+      "program": "train_2d.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/panoptic/posebert_pan_fc.yaml"]
+    },
+    {
+      "name": "poseBert_emd Train",
+      "type": "python",
+      "request": "launch",
+      "program": "train_2d.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
+    },
+    {
+      "name": "pert_train_shang",
+      "type": "python",
+      "request": "launch",
+      "program": "train_2d.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/panoptic/pert12_h5_shang.yaml"]
+    },
+    {
+      "name": "view_frames",
+      "type": "python",
+      "request": "launch",
+      "program": "bad_frames.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
+    },
+    {
+      "name": "Heatmap generator",
+      "type": "python",
+      "request": "launch",
+      "program": "testing_things.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
+    },
+    {
+      "name": "dVAE",
+      "type": "python",
+      "request": "launch",
+      "program": "train_vae_pose.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
+    }
+  ]
 }
