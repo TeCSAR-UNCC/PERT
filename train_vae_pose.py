@@ -6,8 +6,8 @@ from pathlib import Path
 # torch
 
 import torch
-from torch.optim import Adam
-from torch.optim.lr_scheduler import ExponentialLR
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 # vision imports
 
@@ -59,11 +59,20 @@ train_group.add_argument("--epochs", type=int, default=20, help="number of epoch
 train_group.add_argument("--batch_size", type=int, default=8, help="batch size")
 
 train_group.add_argument(
-    "--learning_rate", type=float, default=1e-3, help="learning rate"
+    "--learning_rate", type=float, default=6e-4, help="learning rate"
 )
 
 train_group.add_argument(
-    "--lr_decay_rate", type=float, default=0.98, help="learning rate decay"
+    "--min_learning_rate", type=float, default=6e-5, help="Minimum learning rate"
+)
+
+train_group.add_argument(
+    "--weight_decay", type=float, default=1e-1, help="learning rate decay"
+)
+
+# FIXME: Not used any more!
+train_group.add_argument(
+    "--lr_decay_rate", type=float, default=0.99, help="learning rate decay"
 )
 
 train_group.add_argument(
@@ -117,7 +126,9 @@ update_config(args.cfg)
 EPOCHS = args.epochs
 BATCH_SIZE = args.batch_size
 LEARNING_RATE = args.learning_rate
+MIN_LEARNING_RATE = args.min_learning_rate
 LR_DECAY_RATE = args.lr_decay_rate
+WEIGHT_DECAY = args.weight_decay
 
 NUM_TOKENS = args.num_tokens
 NUM_LAYERS = args.num_layers
@@ -132,6 +143,7 @@ TEMP_MIN = args.temp_min
 ANNEAL_RATE = args.anneal_rate
 
 NUM_IMAGES_SAVE = args.num_images_save
+
 
 # initialize distributed backend
 
@@ -184,8 +196,10 @@ if distr_backend.is_root_worker():
 
 # optimizer
 
-opt = Adam(vae.parameters(), lr=LEARNING_RATE)
-sched = ExponentialLR(optimizer=opt, gamma=LR_DECAY_RATE)
+opt = AdamW(vae.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+sched = CosineAnnealingWarmRestarts(
+    optimizer=opt, eta_min=MIN_LEARNING_RATE, T_0=len(dl), T_mult=2
+)
 
 
 if distr_backend.is_root_worker():
@@ -201,7 +215,11 @@ if distr_backend.is_root_worker():
     )
 
     run = wandb.init(
-        project="heatmap_train_vae", job_type="dVAE_model", config=model_config
+        project="heatmap_train_vae_window_{}_layer_{}".format(
+            config.DATASET.window_size, NUM_LAYERS
+        ),
+        job_type="dVAE_model",
+        config=model_config,
     )
 
 # distribute
@@ -275,7 +293,7 @@ for epoch in range(EPOCHS):
 
         if i % 100 == 0:
             if distr_backend.is_root_worker():
-                k = 1
+                k = 4
 
                 with torch.no_grad():
                     codes = vae.get_codebook_indices(heatmaps[:k])
@@ -297,9 +315,9 @@ for epoch in range(EPOCHS):
                     )
                 """
 
-                heatmaps_rgb = convert_to_rgb_3d(heatmaps[0].numpy())
-                recons_rgb = convert_to_rgb_3d(recons[0].numpy())
-                hard_recons_rgb = convert_to_rgb_3d(hard_recons[0].numpy())
+                heatmaps_rgb = convert_to_rgb_3d(heatmaps.numpy())
+                recons_rgb = convert_to_rgb_3d(recons.numpy())
+                hard_recons_rgb = convert_to_rgb_3d(hard_recons.numpy())
                 logs = {
                     **logs,
                     "sample heatmap": wandb.Video(
@@ -316,17 +334,17 @@ for epoch in range(EPOCHS):
                 }
 
                 wandb.save("./vae.pt")
+
             save_model(f"./vae.pt")
 
             # temperature anneal
 
             temp = max(temp * math.exp(-ANNEAL_RATE * global_step), TEMP_MIN)
 
-            # lr decay
-
-            # Do not advance schedulers from `deepspeed_config`.
-            if not using_deepspeed_sched:
-                distr_sched.step()
+        # lr decay
+        # Do not advance schedulers from `deepspeed_config`.
+        if not using_deepspeed_sched:
+            distr_sched.step()
 
         # Collective loss, averaged
         avg_loss = distr_backend.average_all(loss)

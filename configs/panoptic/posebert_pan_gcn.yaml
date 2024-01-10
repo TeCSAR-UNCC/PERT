@@ -23,7 +23,7 @@ DATASET:
   train_dataset: 'panoptic'
   test_dataset: 'panoptic'
   root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-  window_size: 30
+  window_size: 90
   frame_interval: 1
   token_window_size: *tws
   add_cls: True
