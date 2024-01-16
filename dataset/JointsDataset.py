@@ -320,42 +320,42 @@ class JointsDataset(Dataset):
 
         data = self._filter_data(data)
 
-        # data, mixed = self._mix(data)
-        # data, (mean, std) = self.normalize_pose(data)
+        data, mixed = self._mix(data)
+        data, (mean, std) = self.normalize_pose(data)
 
         # Add zero padding
-        # prev_length = data.shape[0]
-        # padding = torch.zeros((self.window_size - prev_length, *data.shape[1:]))
-        # data = torch.cat((data, padding))
+        prev_length = data.shape[0]
+        padding = torch.zeros((self.window_size - prev_length, *data.shape[1:]))
+        data = torch.cat((data, padding))
 
-        # data = self._tokenize(data)
+        data = self._tokenize(data)
 
-        # mask = self._create_mask(data.shape[0])
-        # data = self._class_token(data)
+        mask = self._create_mask(data.shape[0])
+        data = self._class_token(data)
         
-        # gt = data[mask].clone()
+        gt = data[mask].clone()
 
-        # gt = gt.view(gt.shape[0], self.token_window_size, -1, gt.shape[-1])
-        # data[mask] = 1.0
+        gt = gt.view(gt.shape[0], self.token_window_size, -1, gt.shape[-1])
+        data[mask] = 1.0
 
-        # meta = self.meta.iloc[idx:idx + num_frames][::self.frame_interval]
-        # unq_videos = meta[meta.columns[meta.columns != 'frame']].drop_duplicates()
+        meta = self.meta.iloc[idx:idx + num_frames][::self.frame_interval]
+        unq_videos = meta[meta.columns[meta.columns != 'frame']].drop_duplicates()
 
-        # if len(unq_videos) > 1:
-        #     print(meta)
-        #     raise Exception("Multiple videos in one segment")
+        if len(unq_videos) > 1:
+            print(meta)
+            raise Exception("Multiple videos in one segment")
         
-        # meta = self.meta.iloc[idx].to_dict()
-        # meta['mean'] = mean
-        # meta['std'] = std
+        meta = self.meta.iloc[idx].to_dict()
+        meta['mean'] = mean
+        meta['std'] = std
 
-        # special_tokens = [bool(self.mix_chance), self.add_cls]
-        # additional_tokens = len(torch.tensor([0, 0])[special_tokens])
-        # padding = math.ceil(prev_length / self.token_window_size) + additional_tokens
+        special_tokens = [bool(self.mix_chance), self.add_cls]
+        additional_tokens = len(torch.tensor([0, 0])[special_tokens])
+        padding = math.ceil(prev_length / self.token_window_size) + additional_tokens
 
-        # if self.stage == 2:
-        #     mixed = int(unq_videos.values[0, 0][-3:])
-        #     mixed = torch.eye(120)[mixed-1]
+        if self.stage == 2:
+            mixed = int(unq_videos.values[0, 0][-3:])
+            mixed = torch.eye(120)[mixed-1]
         
-        return data
+        # return data
         return (data, gt, mixed, mask, meta, padding)

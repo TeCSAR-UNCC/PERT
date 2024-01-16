@@ -36,7 +36,7 @@ def main():
 
     HeatPose = GeneratePoseTarget()
     results = {
-        'keypoint': np.expand_dims(data, axis=0),
+        'keypoint': np.expand_dims(data, axis=0), # (batch, window, keypoints, xy)
         'img_shape': (1080, 1920),
     }
 
