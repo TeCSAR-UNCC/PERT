@@ -58,7 +58,7 @@
             "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
         },
         {
-            "name": "testing",
+            "name": "Heatmap generator",
             "type": "python",
             "request": "launch",
             "program": "testing_things.py",
