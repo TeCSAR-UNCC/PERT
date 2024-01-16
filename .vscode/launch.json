@@ -19,16 +19,7 @@
       "program": "train_2d.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/panoptic/pert12_h5_ntu.yaml"]
-    },
-    {
-      "name": "poseBert_fc Train",
-      "type": "python",
-      "request": "launch",
-      "program": "train_2d.py",
-      "console": "integratedTerminal",
-      "justMyCode": true,
-      "args": ["--cfg", "configs/panoptic/posebert_pan_fc.yaml"]
+      "args": ["--cfg", "configs/nturgbd/pert12_h5_ntu.yaml"]
     },
     {
       "name": "poseBert_emd Train",
@@ -40,19 +31,10 @@
       "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
     },
     {
-      "name": "pert_train_shang",
-      "type": "python",
-      "request": "launch",
-      "program": "train_2d.py",
-      "console": "integratedTerminal",
-      "justMyCode": true,
-      "args": ["--cfg", "configs/panoptic/pert12_h5_shang.yaml"]
-    },
-    {
       "name": "view_frames",
       "type": "python",
       "request": "launch",
-      "program": "bad_frames.py",
+      "program": "view_frames.py",
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
