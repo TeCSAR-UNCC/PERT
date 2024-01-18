@@ -55,7 +55,7 @@
       "program": "train_vae_pose.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
+      "args": ["--cfg", "configs/dVAE/dVAE_2d4x_res1x.yaml"]
     }
   ]
 }

@@ -58,7 +58,8 @@ class GeneratePoseTarget:
                  # Not sure what to do with the limbs
                  left_limb=(3, 4, 5, 6, 7, 8),
                  right_limb=(9, 10, 11, 12, 13, 14),
-                 heat_map_size=256,
+                 heatmap_size=256,
+                 img_dims=(1080, 1920),
                  scaling=1.):
 
         self.sigma = sigma
@@ -69,7 +70,8 @@ class GeneratePoseTarget:
         self.with_kp = with_kp
         self.with_limb = with_limb
         self.double = double
-        self.heat_map_size = heat_map_size
+        self.heatmap_size = heatmap_size
+        self.img_dims = img_dims
 
         assert self.with_kp + self.with_limb == 1, ('One of "with_limb" and "with_kp" should be set as True.')
         self.left_kp = left_kp
@@ -212,7 +214,7 @@ class GeneratePoseTarget:
                 end_values = max_values[:, end_idx]
                 self.generate_a_limb_heatmap(arr[i], starts, ends, start_values, end_values)
 
-    def gen_an_aug(self, results):
+    def gen_an_aug(self, results, keypoint_score=None):
         """Generate pseudo heatmaps for all frames.
 
         Args:
@@ -222,11 +224,11 @@ class GeneratePoseTarget:
             list[np.ndarray]: The generated pseudo heatmaps.
         """
 
-        all_kps = results['keypoint']
+        all_kps = results
         kp_shape = all_kps.shape
 
         if self.use_score:
-            all_kpscores = results['keypoint_score']
+            all_kpscores = keypoint_score
         else:
             if self.use_gaussian_score:
                 all_kpscores =  np.random.normal(loc=self.mean_gaussian_score, scale=self.scale_gaussian_score, size=kp_shape[:-1])
@@ -235,7 +237,7 @@ class GeneratePoseTarget:
         
         all_kpscores = np.clip(all_kpscores, 0, 1)
         
-        img_h, img_w = results['img_shape']
+        img_h, img_w = self.img_dims
 
         # scale img_h, img_w and kps
         img_h = int(img_h * self.scaling + 0.5)
@@ -247,7 +249,7 @@ class GeneratePoseTarget:
             Keypoint(x=x, y=y) for (y,x) in kps_per_image
         ], shape=(img_h, img_w)) for kps_per_image in all_kps[0]]
                
-        scale = {"height": self.heat_map_size, "width": "keep-aspect-ratio"} if (img_h > img_w) else {"width": self.heat_map_size, "height": "keep-aspect-ratio"}
+        scale = {"height": self.heatmap_size, "width": "keep-aspect-ratio"} if (img_h > img_w) else {"width": self.heatmap_size, "height": "keep-aspect-ratio"}
         
         
         seq = iaa.Sequential([
@@ -268,8 +270,8 @@ class GeneratePoseTarget:
                
         num_frame = kp_shape[1]
         new_img_h, new_img_w = aug_kpt[0].shape
-        pad_width = (new_img_h == self.heat_map_size)
-        pad_size = (self.heat_map_size - new_img_w)//2 if pad_width else (self.heat_map_size - new_img_h)//2
+        pad_width = (new_img_h == self.heatmap_size)
+        pad_size = (self.heatmap_size - new_img_w)//2 if pad_width else (self.heatmap_size - new_img_h)//2
         num_c = 0
         if self.with_kp:
             num_c += all_kps.shape[2]
@@ -302,8 +304,8 @@ class GeneratePoseTarget:
                 indices[r] = l
             heatmap_flip = heatmap[..., ::-1][:, indices]
             heatmap = np.concatenate([heatmap, heatmap_flip])
-        results[key] = heatmap
-        return results
+        combined_heatmaps = heatmap.max(axis=1)
+        return combined_heatmaps
 
     def __repr__(self):
         repr_str = (f'{self.__class__.__name__}('

@@ -1,0 +1,52 @@
+
+# Heatmap Generator
+Heatmap_Generator:
+  use_gaussian_score: false
+  with_limb: true
+  with_kp: false
+  heatmap_size: &hms 128 # HeatMap Size
+
+# Training settings
+epochs: 20
+lr: 0.0006
+min_learning_rate: 0.00006 # Minimum learning rate
+weight_decay: 0.1 # Learning rate decay
+starting_temp: 1.0 # Starting temperature
+temp_min: 0.5 # Minimum temperature to anneal to
+anneal_rate: 0.000001 # Temperature annealing rate
+num_images_save: 4 # Number of images to save
+
+# Dataset Settings
+DATASET:
+  train_dataset: 'nturgbd'
+  test_dataset: 'nturgbd'
+  root: '/mnt/DATASETS_RAID_28TB/nturgbd/'
+  window_size: &dws 300 # Dataset Window Size
+  frame_interval: 1
+  token_window_size: 15
+  stride: 1
+  test_subset: 'validation'
+  train_subset: 'train'
+  rootIDX: 1
+  camera_num: 10
+
+batch_size: 8
+
+# Model Settings
+VAE_Params:
+  image_size: *hms
+  num_layers: 4 # Number of layers (should be 3 or above)
+  num_tokens: 8192 # Number of image tokens
+  codebook_dim: 512
+  hidden_dim: 256
+  channels: *dws
+  num_resnet_blocks: 2 # Number of residual net blocks
+  smooth_l1_loss: true
+  kl_div_loss_weight: 0.0
+  normalization: null
+  
+transparent: true 
+
+# Clean up 
+deepspeed: false
+distributed_backend: false
