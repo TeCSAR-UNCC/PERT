@@ -30,8 +30,10 @@ class JointsDataset(Dataset):
         self.is_train = is_train
 
         this_dir = os.path.dirname(__file__)
-        dataset_root = os.path.join(this_dir, "../..", cfg.DATASET.root)
-        self.dataset_root = os.path.abspath(dataset_root)
+        self.dataset_root = cfg.DATASET.root
+        if isinstance(cfg.DATASET.root, str):
+            dataset_root = os.path.join(this_dir, "../..", cfg.DATASET.root)
+            self.dataset_root = os.path.abspath(dataset_root)
         self.root_id = cfg.DATASET.rootIDX
         self.image_set = image_set
         self.dataset_name = cfg.DATASET.test_dataset
