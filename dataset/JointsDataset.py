@@ -340,7 +340,7 @@ class JointsDataset(Dataset):
             )[0]
         elif num_frames < self.window_size:
             pad_size = ((0, self.window_size - num_frames), (0, 0), (0, 0))
-            data = np.pad(data, pad_size, "constant", 0)
+            data = np.pad(data, pad_size, mode="constant")
 
         data = data[start_idx : start_idx + self.window_size]
 

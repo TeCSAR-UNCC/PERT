@@ -7,7 +7,7 @@ from pathlib import Path
 
 import torch
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+from torch.optim.lr_scheduler import CyclicLR
 
 # vision imports
 
@@ -59,11 +59,11 @@ train_group.add_argument("--epochs", type=int, default=20, help="number of epoch
 train_group.add_argument("--batch_size", type=int, default=8, help="batch size")
 
 train_group.add_argument(
-    "--learning_rate", type=float, default=6e-4, help="learning rate"
+    "--base_learning_rate", type=float, default=1e-6, help="learning rate"
 )
 
 train_group.add_argument(
-    "--min_learning_rate", type=float, default=6e-5, help="Minimum learning rate"
+    "--max_learning_rate", type=float, default=4e-4, help="Minimum learning rate"
 )
 
 train_group.add_argument(
@@ -125,8 +125,11 @@ update_config(args.cfg)
 
 EPOCHS = args.epochs
 BATCH_SIZE = args.batch_size
-LEARNING_RATE = args.learning_rate
-MIN_LEARNING_RATE = args.min_learning_rate
+
+BASE_LEARNING_RATE = args.base_learning_rate
+MAX_LEARNING_RATE = args.max_learning_rate
+
+
 LR_DECAY_RATE = args.lr_decay_rate
 WEIGHT_DECAY = args.weight_decay
 
@@ -196,9 +199,15 @@ if distr_backend.is_root_worker():
 
 # optimizer
 
-opt = AdamW(vae.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-sched = CosineAnnealingWarmRestarts(
-    optimizer=opt, eta_min=MIN_LEARNING_RATE, T_0=len(dl), T_mult=2
+opt = AdamW(vae.parameters(), lr=BASE_LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+sched = CyclicLR(
+    optimizer=opt,
+    max_lr=MAX_LEARNING_RATE,
+    base_lr=BASE_LEARNING_RATE,
+    mode="triangular2",
+    cycle_momentum=False,
+    step_size_up=len(dl),
+    step_size_down=2 * (len(dl)),
 )
 
 
