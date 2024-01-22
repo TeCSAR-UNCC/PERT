@@ -10,6 +10,10 @@ __pycache__/
 *.avi
 *.mp4
 
+# images
+*.png
+*.jpg
+
 # C extensions
 *.so
 

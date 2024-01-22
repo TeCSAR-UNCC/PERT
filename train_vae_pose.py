@@ -40,128 +40,51 @@ from configs.config import update_config
 from utils.heatmap_related import GeneratePoseTarget
 
 
-config_group = parser.add_argument_group("Config")
-config_group.add_argument(
-    "--cfg", help="experiment configure file name", required=True, type=str
-)
+def parse_args():
+    parser = argparse.ArgumentParser(description="Overall Training for dVAE")
+    parser.add_argument(
+        "--cfg", help="experiment configure file name", required=True, type=str
+    )
 
-config_group.add_argument(
-    "--heatmap_size", type=int, required=False, default=256, help="image size"
-)
+    args, rest = parser.parse_known_args()
+    update_config(args.cfg)
 
-parser = distributed_utils.wrap_arg_parser(parser)
-
-
-train_group = parser.add_argument_group("Training settings")
-
-train_group.add_argument("--epochs", type=int, default=20, help="number of epochs")
-
-train_group.add_argument("--batch_size", type=int, default=8, help="batch size")
-
-train_group.add_argument(
-    "--base_learning_rate", type=float, default=1e-6, help="learning rate"
-)
-
-train_group.add_argument(
-    "--max_learning_rate", type=float, default=4e-4, help="Minimum learning rate"
-)
-
-train_group.add_argument(
-    "--weight_decay", type=float, default=1e-1, help="learning rate decay"
-)
-
-# FIXME: Not used any more!
-train_group.add_argument(
-    "--lr_decay_rate", type=float, default=0.99, help="learning rate decay"
-)
-
-train_group.add_argument(
-    "--starting_temp", type=float, default=1.0, help="starting temperature"
-)
-
-train_group.add_argument(
-    "--temp_min", type=float, default=0.5, help="minimum temperature to anneal to"
-)
-
-train_group.add_argument(
-    "--anneal_rate", type=float, default=1e-6, help="temperature annealing rate"
-)
-
-train_group.add_argument(
-    "--num_images_save", type=int, default=4, help="number of images to save"
-)
-
-model_group = parser.add_argument_group("Model settings")
-
-model_group.add_argument(
-    "--num_tokens", type=int, default=8192, help="number of image tokens"
-)
-
-model_group.add_argument(
-    "--num_layers", type=int, default=4, help="number of layers (should be 3 or above)"
-)
-
-model_group.add_argument(
-    "--num_resnet_blocks", type=int, default=2, help="number of residual net blocks"
-)
-
-model_group.add_argument("--smooth_l1_loss", dest="smooth_l1_loss", action="store_true")
-
-model_group.add_argument("--emb_dim", type=int, default=512, help="embedding dimension")
-
-model_group.add_argument("--hidden_dim", type=int, default=256, help="hidden dimension")
-
-model_group.add_argument(
-    "--kl_loss_weight", type=float, default=0.0, help="KL loss weight"
-)
-
-model_group.add_argument("--transparent", dest="transparent", action="store_true")
-
-args = parser.parse_args()
-
-update_config(args.cfg)
-
-# constants
-
-EPOCHS = args.epochs
-BATCH_SIZE = args.batch_size
-
-BASE_LEARNING_RATE = args.base_learning_rate
-MAX_LEARNING_RATE = args.max_learning_rate
+    return args
 
 
-LR_DECAY_RATE = args.lr_decay_rate
-WEIGHT_DECAY = args.weight_decay
+args = parse_args()
 
-NUM_TOKENS = args.num_tokens
-NUM_LAYERS = args.num_layers
-NUM_RESNET_BLOCKS = args.num_resnet_blocks
-SMOOTH_L1_LOSS = args.smooth_l1_loss
-EMB_DIM = args.emb_dim
-HIDDEN_DIM = args.hidden_dim
-KL_LOSS_WEIGHT = args.kl_loss_weight
+# EPOCHS = args.epochs
+# BATCH_SIZE = args.batch_size
+# LEARNING_RATE = args.learning_rate
+# MIN_LEARNING_RATE = args.min_learning_rate
+# LR_DECAY_RATE = args.lr_decay_rate
+# WEIGHT_DECAY = args.weight_decay
 
-STARTING_TEMP = args.starting_temp
-TEMP_MIN = args.temp_min
-ANNEAL_RATE = args.anneal_rate
+# NUM_TOKENS = args.num_tokens
+# NUM_LAYERS = args.num_layers
+# NUM_RESNET_BLOCKS = args.num_resnet_blocks
+# SMOOTH_L1_LOSS = args.smooth_l1_loss
+# EMB_DIM = args.emb_dim
+# HIDDEN_DIM = args.hidden_dim
+# KL_LOSS_WEIGHT = args.kl_loss_weight
 
-NUM_IMAGES_SAVE = args.num_images_save
+# STARTING_TEMP = args.starting_temp
+# TEMP_MIN = args.temp_min
+# ANNEAL_RATE = args.anneal_rate
+
+# NUM_IMAGES_SAVE = args.num_images_save
 
 
 # initialize distributed backend
 
-distr_backend = distributed_utils.set_backend_from_args(args)
+distr_backend = distributed_utils.set_backend_from_args(config)
 distr_backend.initialize()
 
 using_deepspeed = distributed_utils.using_backend(distributed_utils.DeepSpeedBackend)
 
 # data
-HeatPose = GeneratePoseTarget(
-    use_gaussian_score=False,
-    with_limb=True,
-    with_kp=False,
-    heat_map_size=args.heatmap_size,
-)
+HeatPose = GeneratePoseTarget(**config.Heatmap_Generator)
 ds = eval("dataset." + config.DATASET.test_dataset)(
     config, config.DATASET.test_subset, is_train=False, heatmap_generator=HeatPose
 )
@@ -173,22 +96,10 @@ if distributed_utils.using_backend(distributed_utils.HorovodBackend):
 else:
     data_sampler = None
 
-dl = DataLoader(ds, BATCH_SIZE, shuffle=not data_sampler, sampler=data_sampler)
+dl = DataLoader(ds, config.batch_size, shuffle=not data_sampler, sampler=data_sampler)
 
-vae_params = dict(
-    image_size=args.heatmap_size,
-    num_layers=NUM_LAYERS,
-    num_tokens=NUM_TOKENS,
-    channels=config.DATASET.window_size,
-    codebook_dim=EMB_DIM,
-    hidden_dim=HIDDEN_DIM,
-    num_resnet_blocks=NUM_RESNET_BLOCKS,
-    normalization=None,
-)
+vae = DiscreteVAE(**config.VAE_Params)
 
-vae = DiscreteVAE(
-    **vae_params, smooth_l1_loss=SMOOTH_L1_LOSS, kl_div_loss_weight=KL_LOSS_WEIGHT
-)
 if not using_deepspeed:
     vae = vae.cuda()
 
@@ -199,15 +110,9 @@ if distr_backend.is_root_worker():
 
 # optimizer
 
-opt = AdamW(vae.parameters(), lr=BASE_LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-sched = CyclicLR(
-    optimizer=opt,
-    max_lr=MAX_LEARNING_RATE,
-    base_lr=BASE_LEARNING_RATE,
-    mode="triangular2",
-    cycle_momentum=False,
-    step_size_up=len(dl),
-    step_size_down=2 * (len(dl)),
+opt = AdamW(vae.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+sched = CosineAnnealingWarmRestarts(
+    optimizer=opt, eta_min=config.min_learning_rate, T_0=len(dl), T_mult=2
 )
 
 
@@ -217,15 +122,15 @@ if distr_backend.is_root_worker():
     import wandb
 
     model_config = dict(
-        num_tokens=NUM_TOKENS,
-        smooth_l1_loss=SMOOTH_L1_LOSS,
-        num_resnet_blocks=NUM_RESNET_BLOCKS,
-        kl_loss_weight=KL_LOSS_WEIGHT,
+        num_tokens=config.VAE_Params.num_tokens,
+        smooth_l1_loss=config.VAE_Params.smooth_l1_loss,
+        num_resnet_blocks=config.VAE_Params.num_resnet_blocks,
+        kl_loss_weight=config.VAE_Params.kl_div_loss_weight,
     )
 
     run = wandb.init(
         project="heatmap_train_vae_window_{}_layer_{}".format(
-            config.DATASET.window_size, NUM_LAYERS
+            config.DATASET.window_size, config.VAE_Params.num_layers
         ),
         job_type="dVAE_model",
         config=model_config,
@@ -233,8 +138,8 @@ if distr_backend.is_root_worker():
 
 # distribute
 
-distr_backend.check_batch_size(BATCH_SIZE)
-deepspeed_config = {"train_batch_size": BATCH_SIZE}
+distr_backend.check_batch_size(config.batch_size)
+deepspeed_config = {"train_batch_size": config.batch_size}
 
 (distr_vae, distr_opt, distr_dl, distr_sched) = distr_backend.distribute(
     args=args,
@@ -258,7 +163,7 @@ elif using_deepspeed:
 
 def save_model(path):
     save_obj = {
-        "hparams": vae_params,
+        "hparams": config.VAE_Params,
     }
     if using_deepspeed:
         cp_path = Path(path)
@@ -279,9 +184,9 @@ def save_model(path):
 # starting temperature
 
 global_step = 0
-temp = STARTING_TEMP
+temp = config.starting_temp
 
-for epoch in range(EPOCHS):
+for epoch in range(config.epochs):
     for i, heatmaps in enumerate(distr_dl):
         heatmaps = heatmaps.cuda()
 
@@ -348,7 +253,9 @@ for epoch in range(EPOCHS):
 
             # temperature anneal
 
-            temp = max(temp * math.exp(-ANNEAL_RATE * global_step), TEMP_MIN)
+            temp = max(
+                temp * math.exp(-config.anneal_rate * global_step), config.temp_min
+            )
 
         # lr decay
         # Do not advance schedulers from `deepspeed_config`.

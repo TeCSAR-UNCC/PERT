@@ -133,9 +133,8 @@ LIMBS = [[0, 1],
 
 
 class Panoptic(JointsDataset):
-    def __init__(self, cfg, image_set, is_train, heatmap_generator):
+    def __init__(self, cfg, image_set, is_train, heatmap_generator=None, **kwargs):
         super().__init__(cfg, image_set, is_train, heatmap_generator=heatmap_generator)
-        self.pixel_std = 200.0
         self.joints_def = JOINTS_DEF
         self.limbs = LIMBS
         self.joint_indices = list(JOINTS_DEF.values())

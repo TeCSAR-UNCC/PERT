@@ -94,12 +94,11 @@ JOINTS_DEF = {
 
 
 class Nturgbd(JointsDataset):
-    def __init__(self, cfg, image_set, is_train, heatmap_generator):
+    def __init__(self, cfg, image_set, is_train, heatmap_generator=None, **kwargs):
         super().__init__(cfg, image_set, is_train, heatmap_generator=heatmap_generator)
-        self.pixel_std = 200.0
         self.joints_def = JOINTS_DEF
         self.joint_indices = list(JOINTS_DEF.values())
-        self.joint_req = 0.5
+        self.joint_req = 0.9
         # self.num_joints = len(JOINTS_DEF)
         self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 

@@ -20,7 +20,6 @@ from configs.config import config
 from configs.config import update_config
 from bert_pytorch import BERT, PoseBERT
 from bert_pytorch import BERTTrainer
-from dataset.shanghai import get_dataset_and_loader
 from utils.data_utils import trans_list
 from torch import nn
 import dataset
