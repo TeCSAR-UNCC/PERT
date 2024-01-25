@@ -4,6 +4,8 @@ epochs: 20
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
+base_learning_rate: 1.0e-6
+max_learning_rate: 1.0e-4
 coeff_step_size_up: 0.5
 coeff_step_size_down: 2
 weight_decay: 0.1 # Learning rate decay
@@ -30,13 +32,14 @@ Heatmap_Generator:
 
 # Dataset Settings
 DATASET:
-  train_dataset: 'pan_ntu'
-  test_dataset: 'pan_ntu'
-  root: # '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-    panoptic: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-    nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
+  train_dataset: 'panoptic'
+  test_dataset: 'panoptic'
+  root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
+    #panoptic: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
+    #nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
   window_size: &dws 300 # Dataset Window Size
   frame_interval: 1
+  #FIXME: What is this?
   token_window_size: 15
   stride: 1
   test_subset: 'validation'
@@ -60,6 +63,9 @@ VAE_Params:
 
 Pretrained_Models:
   discrete_vae_weight_path: './saved_models/vae.pt'
+  PERT:
+    path_folder: './saved_models/pert/'
+    prefix_saved_file: 'pert_iter_{}.pt'
 
 PERT:
   window_size:

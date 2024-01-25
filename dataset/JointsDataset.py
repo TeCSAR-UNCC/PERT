@@ -33,7 +33,9 @@ class JointsDataset(Dataset):
         self.flip_pairs = []
         self.norm = [1920, 1080]
         self.heatmap_size = (256, 256)
-        self.heatmap_generator = (heatmap_generator,)
+        # NOTE: Why tuple?!
+        # self.heatmap_generator = (heatmap_generator,)
+        self.heatmap_generator = heatmap_generator
 
         self.is_train = is_train
 
@@ -176,6 +178,6 @@ class JointsDataset(Dataset):
             data = self.heatmap_generator(np.expand_dims(data, axis=0))
 
         if self.masked_position_generator is not None:
-            data = [data, self.masked_position_generator(data)]
+            data = [data, self.masked_position_generator()]
 
         return data

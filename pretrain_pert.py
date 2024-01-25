@@ -46,6 +46,7 @@ from utils import init_distributed_mode, get_rank
 from utils.args_handler import get_args
 
 from timm.models import create_model
+from timm.utils import accuracy
 
 from utils.get_dVAE import get_dVAE
 
@@ -57,6 +58,8 @@ def get_model(args):
     print(f"Creating model: {args.model}")
     model = create_model(
         args.model,
+        img_size=config.Heatmap_Generator.heatmap_size,
+        in_chans=config.DATASET.window_size,
         pretrained=False,
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
@@ -66,6 +69,21 @@ def get_model(args):
     )
 
     return model
+
+
+"""
+def save_model(path, dist_model, using_deepspeed):
+    save_obj = {
+        "hparams": config.VAE_Params,
+    }
+    if using_deepspeed:
+        cp_path = Path(path)
+        path_sans_extension = cp_path.parent / cp_path.stem
+        cp_dir = str(path_sans_extension) + "-ds-cp"
+
+        dist_model.save_checkpoint(cp_dir, client_state=save_obj)
+        # We do not return so we do get a "normal" checkpoint to refer to.
+"""
 
 
 def main(args):
@@ -103,7 +121,7 @@ def main(args):
     dVAE = get_dVAE(config, using_deepspeed=using_deepspeed)
 
     if not using_deepspeed:
-        vae = vae.to(device)
+        dVAE = dVAE.to(device)
 
     # data
     HeatPose = GeneratePoseTarget(**config.Heatmap_Generator)
@@ -120,40 +138,34 @@ def main(args):
     else:
         data_sampler = None
 
-    dl = DataLoader(ds, args.batch_size, shuffle=not data_sampler, sampler=data_sampler)
+    dl = DataLoader(
+        ds, config.batch_size, shuffle=not data_sampler, sampler=data_sampler
+    )
 
-    opt = AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+    opt = AdamW(
+        model.parameters(),
+        lr=config.base_learning_rate,
+        weight_decay=config.weight_decay,
+    )
 
     sched = CyclicLR(
         optimizer=opt,
-        base_lr=args.base_learning_rate,
-        max_lr=args.max_learning_rate,
+        base_lr=config.base_learning_rate,
+        max_lr=config.max_learning_rate,
         mode="triangular2",
-        step_size_up=args.coeff_step_size_up * len(ds),
-        step_size_down=args.coeff_step_size_down * len(ds),
+        step_size_up=config.coeff_step_size_up * len(ds),
+        step_size_down=config.coeff_step_size_down * len(ds),
+        cycle_momentum=False,
     )
-
-    if distr_backend.is_root_worker():
-        # weights & biases experiment tracking
-
-        import wandb
-
-        run = wandb.init(
-            project="PERT_window_{}_layer_{}".format(
-                config.DATASET.window_size, config.VAE_Params.num_layers
-            ),
-            job_type="training",
-            config=args.model,
-        )
 
     # distribute
 
     distr_backend.check_batch_size(config.batch_size)
     deepspeed_config = {"train_batch_size": config.batch_size}
 
-    (distr_vae, distr_opt, distr_dl, distr_sched) = distr_backend.distribute(
+    (dist_model, distr_opt, distr_dl, distr_sched) = distr_backend.distribute(
         args=args,
-        model=vae,
+        model=model,
         optimizer=opt,
         model_parameters=model.parameters(),
         training_data=ds if using_deepspeed else dl,
@@ -161,16 +173,45 @@ def main(args):
         config_params=deepspeed_config,
     )
 
-    # starting temperature
+    using_deepspeed_sched = False
+    # Prefer scheduler in `deepspeed_config`.
+    if distr_sched is None:
+        distr_sched = sched
+    elif using_deepspeed:
+        # We are using a DeepSpeed LR scheduler and want to let DeepSpeed
+        # handle its scheduling.
+        using_deepspeed_sched = True
+
+    if distr_backend.is_root_worker():
+        # weights & biases experiment tracking
+
+        import wandb
+
+        model_config = dict(
+            name=args.model,
+            img_size=config.Heatmap_Generator.heatmap_size,
+            in_chans=config.DATASET.window_size,
+            pretrained=False,
+            drop_path_rate=args.drop_path,
+            drop_block_rate=None,
+            use_shared_rel_pos_bias=args.rel_pos_bias,
+            use_abs_pos_emb=args.abs_pos_emb,
+            init_values=args.layer_scale_init_value,
+        )
+
+        run = wandb.init(
+            project="PERT_window_{}_model_{}".format(
+                config.DATASET.window_size, args.model
+            ),
+            job_type="training",
+            config=model_config,
+        )
 
     global_step = 0
-    temp = config.starting_temp
 
     for epoch in range(config.epochs):
         for i, batch in enumerate(distr_dl):
             model.train()
-
-            heatmaps = heatmaps.to(device)
 
             heatmaps, bool_masked_pos = batch
             heatmaps = heatmaps.to(device, non_blocking=True)
@@ -178,7 +219,7 @@ def main(args):
             bool_masked_pos = bool_masked_pos.to(device, non_blocking=True)
 
             with torch.no_grad():
-                input_ids = vae.get_codebook_indices(heatmaps).flatten(1)
+                input_ids = dVAE.get_codebook_indices(heatmaps).flatten(1)
                 bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
                 labels = input_ids[bool_masked_pos]
 
@@ -196,67 +237,14 @@ def main(args):
 
             if using_deepspeed:
                 # Gradients are automatically zeroed after the step
-                distr_vae.backward(loss)
-                distr_vae.step()
+                dist_model.backward(loss)
+                dist_model.step()
             else:
                 distr_opt.zero_grad()
                 loss.backward()
                 distr_opt.step()
 
             logs = {}
-
-            if i % 100 == 0:
-                if distr_backend.is_root_worker():
-                    k = 4
-
-                    with torch.no_grad():
-                        codes = vae.get_codebook_indices(heatmaps[:k])
-                        hard_recons = vae.decode(codes)
-
-                    heatmaps, recons = map(lambda t: t[:k], (heatmaps, recons))
-                    heatmaps, recons, hard_recons, codes = map(
-                        lambda t: t.detach().cpu(),
-                        (heatmaps, recons, hard_recons, codes),
-                    )
-                    """
-                        heatmaps, recons, hard_recons = map(
-                            lambda t: make_grid(
-                                t.float(),
-                                nrow=int(sqrt(k)),
-                                normalize=True,
-                                value_range=(-1, 1),
-                            ),
-                            (heatmaps, recons, hard_recons),
-                        )
-                    """
-
-                    heatmaps_rgb = convert_to_rgb_3d(heatmaps.numpy())
-                    recons_rgb = convert_to_rgb_3d(recons.numpy())
-                    hard_recons_rgb = convert_to_rgb_3d(hard_recons.numpy())
-                    logs = {
-                        **logs,
-                        "sample heatmap": wandb.Video(
-                            heatmaps_rgb, fps=30, caption="original heatmap"
-                        ),
-                        "reconstructions": wandb.Video(
-                            recons_rgb, fps=30, caption="reconstructions"
-                        ),
-                        "hard reconstructions": wandb.Video(
-                            hard_recons_rgb, fps=30, caption="hard reconstructions"
-                        ),
-                        "codebook_indices": wandb.Histogram(codes),
-                        "temperature": temp,
-                    }
-
-                    wandb.save("./vae.pt")
-
-                save_model(f"./vae.pt")
-
-                # temperature anneal
-
-                temp = max(
-                    temp * math.exp(-config.anneal_rate * global_step), config.temp_min
-                )
 
             # lr decay
             # Do not advance schedulers from `deepspeed_config`.
@@ -265,6 +253,7 @@ def main(args):
 
             # Collective loss, averaged
             avg_loss = distr_backend.average_all(loss)
+            acc = accuracy(outputs, labels, topk=(1, 5))
 
             if distr_backend.is_root_worker():
                 if i % 10 == 0:
@@ -273,6 +262,8 @@ def main(args):
 
                     logs = {
                         **logs,
+                        "Top-1": acc[0].item(),
+                        "Top-5": acc[1].item(),
                         "epoch": epoch,
                         "iter": i,
                         "loss": avg_loss.item(),
@@ -286,7 +277,7 @@ def main(args):
             # save trained model to wandb as an artifact every epoch's end
 
             model_artifact = wandb.Artifact(
-                "trained-vae", type="model", metadata=dict(model_config)
+                "trained-model", type="model", metadata=dict(args.model)
             )
             model_artifact.add_file("vae.pt")
             run.log_artifact(model_artifact)
@@ -294,11 +285,11 @@ def main(args):
     if distr_backend.is_root_worker():
         # save final vae and cleanup
 
-        save_model("./vae-final.pt")
-        wandb.save("./vae-final.pt")
+        # save_model("./vae-final.pt")
+        wandb.save("./model-final.pt")
 
         model_artifact = wandb.Artifact(
-            "trained-vae", type="model", metadata=dict(model_config)
+            "trained-vae", type="model", metadata=dict(args.model)
         )
         model_artifact.add_file("vae-final.pt")
         run.log_artifact(model_artifact)
