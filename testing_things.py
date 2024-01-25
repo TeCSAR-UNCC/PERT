@@ -25,7 +25,6 @@ def parse_args():
 
 
 def main():
-    
     args = parse_args()
 
     # train_dataset = eval('dataset.' + config.DATASET.train_dataset)(
