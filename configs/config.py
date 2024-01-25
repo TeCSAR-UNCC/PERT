@@ -15,6 +15,7 @@ from easydict import EasyDict as edict
 
 config = edict()
 
+
 def _update_dict(k, v):
     if k not in config.keys():
         config[k] = edict()
@@ -40,18 +41,20 @@ def gen_config(config_file):
         if isinstance(v, edict):
             cfg[k] = dict(v)
 
-    with open(config_file, 'w') as f:
+    with open(config_file, "w") as f:
         yaml.dump(dict(cfg), f, default_flow_style=False)
 
 
 def get_model_name(cfg):
-    name = '{model}'.format(
-        model=cfg.MODEL)
-    full_name = 'TEST'
+    name = "{model}".format(model=cfg.MODEL)
+    full_name = "TEST"
 
     return name, full_name
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
-    gen_config(sys.argv[1])
+
+    update_config(sys.argv[1])
+
+    print(config)

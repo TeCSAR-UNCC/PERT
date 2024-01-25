@@ -13,19 +13,27 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import os
+from .masking_generator import MaskingGenerator
+from typing import List
 
 logger = logging.getLogger(__name__)
 
 
 class JointsDataset(Dataset):
-    def __init__(self, cfg, image_set, is_train, heatmap_generator=None):
+    def __init__(
+        self,
+        cfg,
+        image_set,
+        is_train,
+        heatmap_generator=None,
+    ):
         self.cfg = cfg
         self.num_joints = 0
         self.pixel_std = 200
         self.flip_pairs = []
         self.norm = [1920, 1080]
         self.heatmap_size = (256, 256)
-        self.heatmap_generator = heatmap_generator
+        self.heatmap_generator = (heatmap_generator,)
 
         self.is_train = is_train
 
@@ -44,6 +52,18 @@ class JointsDataset(Dataset):
         self.token_window_size = cfg.DATASET.token_window_size
         self.num_views = cfg.DATASET.camera_num
         self.db = []
+        self.training_mode = None
+        if cfg.DATASET.training_mode.lower() in ["d_vae", "pert"]:
+            self.training_mode = cfg.DATASET.training_mode.lower()
+
+        self.masked_position_generator = None
+        if self.training_mode == "pert":
+            self.masked_position_generator = MaskingGenerator(
+                cfg.PERT.window_size,
+                num_masking_patches=cfg.PERT.num_mask_patches,
+                max_num_patches=cfg.PERT.max_mask_patches_per_block,
+                min_num_patches=cfg.PERT.min_mask_patches_per_block,
+            )
 
     def normalize_pose(self, pose_data):
         """
@@ -154,5 +174,8 @@ class JointsDataset(Dataset):
 
         if self.heatmap_generator is not None:
             data = self.heatmap_generator(np.expand_dims(data, axis=0))
+
+        if self.masked_position_generator is not None:
+            data = [data, self.masked_position_generator(data)]
 
         return data

@@ -56,6 +56,24 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": ["--cfg", "configs/dVAE/dVAE_2d4x_res1x.yaml"]
+    },
+    {
+      "name": "PERT_BEiT",
+      "type": "python",
+      "request": "launch",
+      "program": "pretrain_pert.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/pert.yaml"]
+    },
+    {
+      "name": "pert_config",
+      "type": "python",
+      "request": "launch",
+      "program": "./configs/config.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["configs/PERT/pert.yaml"]
     }
   ]
 }

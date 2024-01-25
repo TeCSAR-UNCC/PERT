@@ -4,17 +4,22 @@ Heatmap_Generator:
   use_gaussian_score: false
   with_limb: true
   with_kp: false
-  heatmap_size: &hms 128 # HeatMap Size
+  heatmap_size: &hms 256 # HeatMap Size
 
 # Training settings
 epochs: 20
-lr: 0.0006
-min_learning_rate: 0.00006 # Minimum learning rate
+base_learning_rate: 1e-6
+max_learning_rate: 4e-4
+
+#Not used for `triangular2` cyclic!
+lr_decay: 0.99
 weight_decay: 0.1 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 anneal_rate: 0.000001 # Temperature annealing rate
 num_images_save: 4 # Number of images to save
+coeff_step_size_up: 0.5
+coeff_step_size_down: 2
 
 # Dataset Settings
 DATASET:

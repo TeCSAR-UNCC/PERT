@@ -111,8 +111,13 @@ if distr_backend.is_root_worker():
 # optimizer
 
 opt = AdamW(vae.parameters(), lr=config.lr, weight_decay=config.weight_decay)
-sched = CosineAnnealingWarmRestarts(
-    optimizer=opt, eta_min=config.min_learning_rate, T_0=len(dl), T_mult=2
+sched = CyclicLR(
+    optimizer=opt,
+    base_lr=args.base_learning_rate,
+    max_lr=args.max_learning_rate,
+    mode="triangular2",
+    step_size_up=args.coeff_step_size_up * len(ds),
+    step_size_down=args.coeff_step_size_down * len(ds),
 )
 
 

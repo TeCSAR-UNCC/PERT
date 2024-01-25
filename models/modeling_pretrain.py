@@ -13,31 +13,57 @@ import torch
 import torch.nn as nn
 from functools import partial
 
-from modeling_finetune import Block, _cfg, PatchEmbed, RelativePositionBias
+from .modeling_finetune import Block, _cfg, PatchEmbed, RelativePositionBias
 from timm.models.registry import register_model
 from timm.models.layers import trunc_normal_ as __call_trunc_normal_
 
 
-def trunc_normal_(tensor, mean=0., std=1.):
+def trunc_normal_(tensor, mean=0.0, std=1.0):
     __call_trunc_normal_(tensor, mean=mean, std=std, a=-std, b=std)
 
 
 __all__ = [
-    'beit_base_patch16_224_8k_vocab', 
-    'beit_large_patch16_224_8k_vocab', 
+    "beit_base_patch16_224_8k_vocab",
+    "beit_large_patch16_224_8k_vocab",
 ]
 
 
 class VisionTransformerForMaskedImageModeling(nn.Module):
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, vocab_size=8192, embed_dim=768, depth=12,
-                 num_heads=12, mlp_ratio=4., qkv_bias=True, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
-                 drop_path_rate=0., norm_layer=None, init_values=None, attn_head_dim=None,
-                 use_abs_pos_emb=True, use_rel_pos_bias=False, use_shared_rel_pos_bias=False, init_std=0.02, **kwargs):
+    def __init__(
+        self,
+        img_size=224,
+        patch_size=16,
+        in_chans=3,
+        vocab_size=8192,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        mlp_ratio=4.0,
+        qkv_bias=True,
+        qk_scale=None,
+        drop_rate=0.0,
+        attn_drop_rate=0.0,
+        drop_path_rate=0.0,
+        norm_layer=None,
+        init_values=None,
+        attn_head_dim=None,
+        use_abs_pos_emb=True,
+        use_rel_pos_bias=False,
+        use_shared_rel_pos_bias=False,
+        init_std=0.02,
+        **kwargs
+    ):
         super().__init__()
-        self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
+        self.num_features = (
+            self.embed_dim
+        ) = embed_dim  # num_features for consistency with other models
 
         self.patch_embed = PatchEmbed(
-            img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
+            img_size=img_size,
+            patch_size=patch_size,
+            in_chans=in_chans,
+            embed_dim=embed_dim,
+        )
         num_patches = self.patch_embed.num_patches
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -49,19 +75,36 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
         self.pos_drop = nn.Dropout(p=drop_rate)
 
         if use_shared_rel_pos_bias:
-            self.rel_pos_bias = RelativePositionBias(window_size=self.patch_embed.patch_shape, num_heads=num_heads)
+            self.rel_pos_bias = RelativePositionBias(
+                window_size=self.patch_embed.patch_shape, num_heads=num_heads
+            )
         else:
             self.rel_pos_bias = None
 
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
-        self.blocks = nn.ModuleList([
-            Block(
-                dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale,
-                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer,
-                init_values=init_values, window_size=self.patch_embed.patch_shape if use_rel_pos_bias else None,
-                attn_head_dim=attn_head_dim,
-            )
-            for i in range(depth)])
+        dpr = [
+            x.item() for x in torch.linspace(0, drop_path_rate, depth)
+        ]  # stochastic depth decay rule
+        self.blocks = nn.ModuleList(
+            [
+                Block(
+                    dim=embed_dim,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=qkv_bias,
+                    qk_scale=qk_scale,
+                    drop=drop_rate,
+                    attn_drop=attn_drop_rate,
+                    drop_path=dpr[i],
+                    norm_layer=norm_layer,
+                    init_values=init_values,
+                    window_size=self.patch_embed.patch_shape
+                    if use_rel_pos_bias
+                    else None,
+                    attn_head_dim=attn_head_dim,
+                )
+                for i in range(depth)
+            ]
+        )
         self.norm = norm_layer(embed_dim)
 
         self.init_std = init_std
@@ -98,7 +141,7 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
 
     @torch.jit.ignore
     def no_weight_decay(self):
-        return {'pos_embed', 'cls_token'}
+        return {"pos_embed", "cls_token"}
 
     def get_num_layers(self):
         return len(self.blocks)
@@ -107,7 +150,9 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
         x = self.patch_embed(x, bool_masked_pos=bool_masked_pos)
         batch_size, seq_len, _ = x.size()
 
-        cls_tokens = self.cls_token.expand(batch_size, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
+        cls_tokens = self.cls_token.expand(
+            batch_size, -1, -1
+        )  # stole cls_tokens impl from Phil Wang, thanks
         mask_token = self.mask_token.expand(batch_size, seq_len, -1)
 
         # replace the masked visual tokens by mask_token
@@ -138,13 +183,19 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
 @register_model
 def beit_base_patch16_224_8k_vocab(pretrained=False, **kwargs):
     model = VisionTransformerForMaskedImageModeling(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), vocab_size=8192, **kwargs)
+        patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        vocab_size=8192,
+        **kwargs
+    )
     model.default_cfg = _cfg()
     if pretrained:
-        checkpoint = torch.load(
-            kwargs["init_ckpt"], map_location="cpu"
-        )
+        checkpoint = torch.load(kwargs["init_ckpt"], map_location="cpu")
         model.load_state_dict(checkpoint["model"])
     return model
 
@@ -152,12 +203,18 @@ def beit_base_patch16_224_8k_vocab(pretrained=False, **kwargs):
 @register_model
 def beit_large_patch16_224_8k_vocab(pretrained=False, **kwargs):
     model = VisionTransformerForMaskedImageModeling(
-        patch_size=16, embed_dim=1024, depth=24, num_heads=16, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), vocab_size=8192, **kwargs)
+        patch_size=16,
+        embed_dim=1024,
+        depth=24,
+        num_heads=16,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        vocab_size=8192,
+        **kwargs
+    )
     model.default_cfg = _cfg()
     if pretrained:
-        checkpoint = torch.load(
-            kwargs["init_ckpt"], map_location="cpu"
-        )
+        checkpoint = torch.load(kwargs["init_ckpt"], map_location="cpu")
         model.load_state_dict(checkpoint["model"])
     return model
