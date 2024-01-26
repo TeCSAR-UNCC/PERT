@@ -1,6 +1,11 @@
 # wandb
 wandb/
 
+# For profiling
+Profiling/
+PeRT_trainMe_Profiling.sh
+pretrain_pert_profiling.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

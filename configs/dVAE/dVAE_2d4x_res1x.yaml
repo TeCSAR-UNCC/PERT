@@ -21,6 +21,7 @@ anneal_rate: 0.000001 # Temperature annealing rate
 num_images_save: 4 # Number of images to save
 coeff_step_size_up: 0.5
 coeff_step_size_down: 2
+batch_size: 8
 
 # Dataset Settings
 DATASET:
