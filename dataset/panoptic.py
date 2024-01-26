@@ -24,6 +24,8 @@ import pandas as pd
 
 from dataset.JointsDataset import JointsDataset
 from utils.transforms import projectPoints
+from dataset.kalman_filter import KeypointsKalmanFilter
+from utils.heatmap_related import GeneratePoseTarget
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +99,7 @@ CAMERA_LIST = [1, 2, 4, 6, 7, 10, 13, 17, 19, 28]
 
 JOINTS_DEF = {
     "neck": 0,
-    # 'nose': 1,
+    "nose": 1,
     "mid-hip": 2,
     "l-shoulder": 3,
     "l-elbow": 4,
@@ -111,45 +113,57 @@ JOINTS_DEF = {
     "r-hip": 12,
     "r-knee": 13,
     "r-ankle": 14,
-    # 'l-eye': 15,
+    "l-eye": 15,
     "l-ear": 16,
-    # 'r-eye': 17,
+    "r-eye": 17,
     "r-ear": 18,
 }
 
-LIMBS = [
-    [0, 1],
-    [0, 2],
-    [0, 3],
-    [3, 4],
-    [4, 5],
-    [0, 9],
-    [9, 10],
-    [10, 11],
-    [2, 6],
-    [2, 12],
-    [6, 7],
-    [7, 8],
-    [12, 13],
-    [13, 14],
+JOINTS_PAIRS = [
+('l-eye', 'l-ear'),
+('r-eye', 'r-ear'),
+('neck', 'nose'),
+('neck', 'l-shoulder'),
+('l-shoulder', 'l-elbow'),
+('l-elbow', 'l-wrist'),
+('neck', 'r-shoulder'),
+('r-shoulder', 'r-elbow'),
+('r-elbow', 'r-wrist'),
+('neck', 'mid-hip'),
+('mid-hip', 'l-hip'),
+('l-hip', 'l-knee'),
+('l-knee', 'l-ankle'),
+('mid-hip', 'r-hip'),
+('r-hip', 'r-knee'),
+('r-knee', 'r-ankle'),
 ]
 
 
+SKELETON = [(JOINTS_DEF[joint1], JOINTS_DEF[joint2]) 
+            for joint1, joint2 in JOINTS_PAIRS]
+
+LEFT_LIMB = (3, 4, 5, 6, 7, 8)
+RIGHT_LIMB = (9, 10, 11, 12, 13, 14)
+
 class Panoptic(JointsDataset):
-    def __init__(self, cfg, image_set, is_train, heatmap_generator=None, **kwargs):
-        super().__init__(cfg, image_set, is_train, heatmap_generator=heatmap_generator)
+    def __init__(self, cfg, image_set, is_train, **kwargs):
+        super().__init__(cfg, image_set, is_train)
         self.joints_def = JOINTS_DEF
-        self.limbs = LIMBS
         self.joint_indices = list(JOINTS_DEF.values())
-        self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
         self.joint_req = 0.9
-        # self.num_joints = len(JOINTS_DEF)
+        self.heatmap_generator = GeneratePoseTarget(**cfg.Heatmap_Generator,
+                                                    skeletons = SKELETON,
+                                                    left_kp = LEFT_LIMB,
+                                                    left_limb = LEFT_LIMB,
+                                                    right_kp = RIGHT_LIMB,
+                                                    right_limb = RIGHT_LIMB
+                                                    )
+        self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 
         if self.image_set == "train":
             self.sequence_list = TRAIN_LIST
             self._interval = 3
-            self.cam_list = [(0, i) for i in CAMERA_LIST]  # range(0, self.num_views)]
-            # self.cam_list = [(0, 12), (0, 6), (0, 23), (0, 13), (0, 3)]
+            self.cam_list = [(0, i) for i in CAMERA_LIST]
             self.num_views = len(self.cam_list)
         elif self.image_set == "validation":
             self.sequence_list = VAL_LIST
@@ -157,7 +171,7 @@ class Panoptic(JointsDataset):
             self.cam_list = [(0, i) for i in CAMERA_LIST]
             self.num_views = len(self.cam_list)
 
-        self.db_file = "group_{}_cam{}.pkl".format(self.image_set, self.num_views)
+        self.db_file = "ts_group_{}_cam{}.pkl".format(self.image_set, self.num_views)
         self.db_file = os.path.join(self.dataset_root, self.db_file)
 
         if osp.exists(self.db_file):
@@ -170,7 +184,7 @@ class Panoptic(JointsDataset):
             # self.hms = info['heatmap']
             self.meta = info["meta"]
         else:
-            self.vf, self.db, self.hms, self.meta, _ = self._get_db()
+            self.vf, self.db, self.meta, _ = self._get_db()
             info = {
                 "sequence_list": self.sequence_list,
                 "interval": self._interval,
@@ -253,12 +267,9 @@ class Panoptic(JointsDataset):
                         if vis_perc <= self.joint_req:
                             continue
 
-                        head_kp = (pose2d[14] + pose2d[15]) / 2
-                        pose2d = np.delete(pose2d, [14, 15], axis=0)
-                        pose2d = np.insert(pose2d, 1, head_kp, axis=0)
-
-                        # Generate Heatmaps
-                        hm = self.generate_heatmap(copy.deepcopy(pose2d))
+                        # head_kp = (pose2d[14] + pose2d[15]) / 2
+                        # pose2d = np.delete(pose2d, [14, 15], axis=0)
+                        # pose2d = np.insert(pose2d, 1, head_kp, axis=0)
 
                         # if full_id not in prev_pose2d.keys():
                         #     prev_pose2d[full_id] = copy.deepcopy(pose2d)
@@ -275,7 +286,6 @@ class Panoptic(JointsDataset):
                                     "frame": postfix[1:-5],
                                     "video": seq,
                                     "joints_2d": pose2d,
-                                    "heatmap": hm,
                                     "camera": prefix,
                                     "id": body["id"],
                                 }
@@ -316,13 +326,12 @@ class Panoptic(JointsDataset):
 
         valid_frames = np.array(valid_frames[::-1])
         skel_array = np.array([i["joints_2d"] for i in db])
-        hm_array = np.array([i["heatmap"] for i in db])
         meta_db = pd.DataFrame(
             [{k: v for k, v in d.items() if k != "joints_2d"} for d in db]
         )
         unique_combinations = meta_db[["video", "camera", "id"]].drop_duplicates()
 
-        return valid_frames, skel_array, hm_array, meta_db, unique_combinations
+        return valid_frames, skel_array, meta_db, unique_combinations
 
     def _get_cam(self, seq):
         cam_file = osp.join(self.dataset_root, seq, "calibration_{:s}.json".format(seq))
@@ -343,39 +352,3 @@ class Panoptic(JointsDataset):
 
     def __len__(self):
         return self.vf_size // self.stride
-
-
-class KeypointsKalmanFilter:
-    def __init__(self, n_keypoints, dt=1):
-        self.n_keypoints = n_keypoints
-        self.filters = [self._create_kalman_filter(dt) for _ in range(n_keypoints)]
-
-    @staticmethod
-    def _create_kalman_filter(dt):
-        kf = cv2.KalmanFilter(4, 2)
-        kf.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], np.float32)
-        kf.transitionMatrix = np.array(
-            [[1, 0, dt, 0], [0, 1, 0, dt], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32
-        )
-        kf.processNoiseCov = (
-            np.array(
-                [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32
-            )
-            * 1e-2
-        )
-        kf.measurementNoiseCov = np.array([[1, 0], [0, 1]], np.float32) * 1e-1
-        return kf
-
-    def apply(self, keypoints):
-        # Initialize filtered keypoints and velocities with zeros
-        filtered_data = np.zeros_like(keypoints)
-
-        for i, kf in enumerate(self.filters):
-            prediction = kf.predict()
-            measurement = np.array(keypoints[i, :2], dtype=np.float32).reshape(2, 1)
-            corrected = kf.correct(measurement)
-            # Fill in both the position and velocity parts of the output
-            filtered_data[i, :2] = corrected[:2].ravel()
-            filtered_data[i, 2:] = corrected[2:].ravel()
-
-        return filtered_data

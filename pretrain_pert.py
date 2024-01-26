@@ -124,9 +124,8 @@ def main(args):
         dVAE = dVAE.to(device)
 
     # data
-    HeatPose = GeneratePoseTarget(**config.Heatmap_Generator)
     ds = eval("dataset." + config.DATASET.test_dataset)(
-        config, config.DATASET.test_subset, is_train=False, heatmap_generator=HeatPose
+        config, config.DATASET.test_subset, is_train=False
     )
 
     if distributed_utils.using_backend(distributed_utils.HorovodBackend):

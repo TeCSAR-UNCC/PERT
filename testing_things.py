@@ -27,23 +27,17 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # train_dataset = eval('dataset.' + config.DATASET.train_dataset)(
-    #    config, config.DATASET.train_subset, is_train=True)
-    HeatPose = GeneratePoseTarget(
-        use_gaussian_score=False, with_limb=True, with_kp=False, heatmap_size=256
-    )
-    train_dataset = eval("dataset." + config.DATASET.train_dataset)(
-        config, config.DATASET.train_subset, is_train=True, heatmap_generator=HeatPose
-    )
+    train_dataset = eval('dataset.' + config.DATASET.train_dataset)(
+       config, config.DATASET.train_subset, is_train=True)
     train_dataset = eval("dataset." + config.DATASET.test_dataset)(
-        config, config.DATASET.test_subset, is_train=False, heatmap_generator=HeatPose
+        config, config.DATASET.test_subset, is_train=False
     )
 
-    vf_idx = 2967  # Strange head motion?
+    vf_idx = 16
 
     # data, gt, _, mask, meta, padding = train_dataset.__getitem__(vf_idx)
     data = train_dataset.__getitem__(vf_idx)
-    combined_heatmaps = data
+    combined_heatmaps = data[0]
 
     video_name = "heatmap_video.mp4"
     frame_height, frame_width = combined_heatmaps.shape[1], combined_heatmaps.shape[2]

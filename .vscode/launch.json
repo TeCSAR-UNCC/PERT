@@ -46,7 +46,7 @@
       "program": "testing_things.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/panoptic/pert12_h5_ntu.yaml"]
+      "args": ["--cfg", "configs/PERT/pert.yaml"]
     },
     {
       "name": "dVAE",

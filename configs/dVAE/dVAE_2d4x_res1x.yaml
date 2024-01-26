@@ -31,7 +31,6 @@ DATASET:
     nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
   window_size: &dws 300 # Dataset Window Size
   frame_interval: 1
-  token_window_size: 15
   stride: 1
   test_subset: 'validation'
   train_subset: 'train'

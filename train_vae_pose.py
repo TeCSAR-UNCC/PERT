@@ -54,28 +54,6 @@ def parse_args():
 
 args = parse_args()
 
-# EPOCHS = args.epochs
-# BATCH_SIZE = args.batch_size
-# LEARNING_RATE = args.learning_rate
-# MIN_LEARNING_RATE = args.min_learning_rate
-# LR_DECAY_RATE = args.lr_decay_rate
-# WEIGHT_DECAY = args.weight_decay
-
-# NUM_TOKENS = args.num_tokens
-# NUM_LAYERS = args.num_layers
-# NUM_RESNET_BLOCKS = args.num_resnet_blocks
-# SMOOTH_L1_LOSS = args.smooth_l1_loss
-# EMB_DIM = args.emb_dim
-# HIDDEN_DIM = args.hidden_dim
-# KL_LOSS_WEIGHT = args.kl_loss_weight
-
-# STARTING_TEMP = args.starting_temp
-# TEMP_MIN = args.temp_min
-# ANNEAL_RATE = args.anneal_rate
-
-# NUM_IMAGES_SAVE = args.num_images_save
-
-
 # initialize distributed backend
 
 distr_backend = distributed_utils.set_backend_from_args(config)
@@ -83,10 +61,8 @@ distr_backend.initialize()
 
 using_deepspeed = distributed_utils.using_backend(distributed_utils.DeepSpeedBackend)
 
-# data
-HeatPose = GeneratePoseTarget(**config.Heatmap_Generator)
 ds = eval("dataset." + config.DATASET.test_dataset)(
-    config, config.DATASET.test_subset, is_train=False, heatmap_generator=HeatPose
+    config, config.DATASET.test_subset, is_train=False
 )
 
 if distributed_utils.using_backend(distributed_utils.HorovodBackend):
