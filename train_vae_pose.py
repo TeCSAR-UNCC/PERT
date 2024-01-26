@@ -113,13 +113,13 @@ if distr_backend.is_root_worker():
 opt = AdamW(vae.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 sched = CyclicLR(
     optimizer=opt,
-    base_lr=args.base_learning_rate,
-    max_lr=args.max_learning_rate,
+    base_lr=config.base_learning_rate,
+    max_lr=config.max_learning_rate,
     mode="triangular2",
-    step_size_up=args.coeff_step_size_up * len(ds),
-    step_size_down=args.coeff_step_size_down * len(ds),
+    step_size_up=config.coeff_step_size_up * len(ds),
+    step_size_down=config.coeff_step_size_down * len(ds),
+    cycle_momentum=False,
 )
-
 
 if distr_backend.is_root_worker():
     # weights & biases experiment tracking
