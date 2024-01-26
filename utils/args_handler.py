@@ -87,7 +87,7 @@ def get_args():
     parser.add_argument("--no_auto_resume", action="store_false", dest="auto_resume")
     parser.set_defaults(auto_resume=True)
 
-    parser.add_argument("--num_workers", default=10, type=int)
+    parser.add_argument("--num_workers", default=32, type=int)
     parser.add_argument(
         "--pin_mem",
         action="store_true",
