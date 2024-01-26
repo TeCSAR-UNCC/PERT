@@ -18,24 +18,20 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
-
 class JointsDataset(Dataset):
     def __init__(
         self,
         cfg,
         image_set,
         is_train,
-        heatmap_generator=None,
     ):
         self.cfg = cfg
         self.num_joints = 0
-        self.pixel_std = 200
-        self.flip_pairs = []
         self.norm = [1920, 1080]
-        self.heatmap_size = (256, 256)
+        # self.heatmap_size = cfg.Heatmap_Generator.heatmap_size # (256, 256)
         # NOTE: Why tuple?!
         # self.heatmap_generator = (heatmap_generator,)
-        self.heatmap_generator = heatmap_generator
+        self.heatmap_generator = None
 
         self.is_train = is_train
 
@@ -51,7 +47,6 @@ class JointsDataset(Dataset):
         self.window_size = cfg.DATASET.window_size
         self.total_window = self.window_size * self.frame_interval
         self.stride = cfg.DATASET.stride
-        self.token_window_size = cfg.DATASET.token_window_size
         self.num_views = cfg.DATASET.camera_num
         self.db = []
         self.training_mode = None
@@ -160,7 +155,7 @@ class JointsDataset(Dataset):
 
         data = np.nan_to_num(data, nan=1.0)
 
-        data = self._filter_data(data)
+        # data = self._filter_data(data)
 
         # Select random sequence of frames
         start_idx = 0
