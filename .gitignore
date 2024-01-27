@@ -1,6 +1,9 @@
 # wandb
 wandb/
 
+# Saved models
+*.pt
+
 # For profiling
 Profiling/
 PeRT_trainMe_Profiling.sh
