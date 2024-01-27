@@ -1,4 +1,3 @@
-
 # Heatmap Generator
 Heatmap_Generator:
   use_gaussian_score: false
@@ -8,8 +7,8 @@ Heatmap_Generator:
 
 # Training settings
 epochs: 20
-base_learning_rate: 1e-6
-max_learning_rate: 4e-4
+base_learning_rate: 1.0e-6
+max_learning_rate: 4.0e-4
 batch_size: 8 
 device: 'cuda'
 #Not used for `triangular2` cyclic!
@@ -37,6 +36,7 @@ DATASET:
   train_subset: 'train'
   rootIDX: 1
   camera_num: 10
+  training_mode: 'd_vae'
 
 batch_size: 8
 

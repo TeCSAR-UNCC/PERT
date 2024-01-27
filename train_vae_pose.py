@@ -86,7 +86,7 @@ if distr_backend.is_root_worker():
 
 # optimizer
 
-opt = AdamW(vae.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+opt = AdamW(vae.parameters(), lr=config.base_learning_rate, weight_decay=config.weight_decay)
 # New schedular.
 sched = CyclicLR(
     optimizer=opt,
