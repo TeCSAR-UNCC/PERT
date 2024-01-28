@@ -12,15 +12,15 @@ weight_decay: 0.1 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
-batch_size: 8 
+batch_size: 8
 device: 'cuda'
 
 #NOTE: Not sure what it is.
 transparent: true 
 
 # Clean up 
-deepspeed: false
-distributed_backend: false
+deepspeed: true
+distributed_backend: true
 
 # Heatmap Generator
 Heatmap_Generator:
@@ -34,7 +34,7 @@ Heatmap_Generator:
 DATASET:
   train_dataset: 'panoptic'
   test_dataset: 'panoptic'
-  root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
+  root: '/home/mbaharan/'
     #panoptic: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
     #nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
   window_size: &dws 300 # Dataset Window Size

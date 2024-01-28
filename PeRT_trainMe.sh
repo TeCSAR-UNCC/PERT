@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0 python pretrain_pert.py --cfg configs/PERT/pert.yaml
+deepspeed --num_gpus=2 pretrain_pert_profiling.py --cfg configs/PERT/pert.yaml

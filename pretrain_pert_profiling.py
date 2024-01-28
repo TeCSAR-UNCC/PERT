@@ -19,6 +19,7 @@ from pathlib import Path
 import torch
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CyclicLR
+from torch.profiler import profile, record_function, ProfilerActivity
 
 # dalle classes and utils
 
@@ -84,6 +85,12 @@ def save_model(path, dist_model, using_deepspeed):
         dist_model.save_checkpoint(cp_dir, client_state=save_obj)
         # We do not return so we do get a "normal" checkpoint to refer to.
 """
+
+
+def trace_handler(p):
+    output = p.key_averages().table(sort_by="cpu_time_total", row_limit=10)
+    print(output)
+    p.export_chrome_trace("./Profiling/trace_" + str(p.step_num) + ".json")
 
 
 def main(args):
@@ -216,71 +223,83 @@ def main(args):
 
     global_step = 0
 
-    for epoch in range(config.epochs):
-        for i, batch in enumerate(distr_dl):
-            model.train()
+    with profile(
+        activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+        record_shapes=False,
+        schedule=torch.profiler.schedule(wait=1, warmup=1, active=2),
+        on_trace_ready=trace_handler,
+    ) as prof:
+        for epoch in range(config.epochs):
+            for i in range(len(distr_dl)):
+                with record_function("Data_loader"):
+                    batch = next(iter(distr_dl))
+                model.train()
 
-            heatmaps, bool_masked_pos = batch
-            heatmaps = heatmaps.to(device, non_blocking=True)
-            # samples = samples.to(device, non_blocking=True)
-            bool_masked_pos = bool_masked_pos.to(device, non_blocking=True)
+                heatmaps, bool_masked_pos = batch
+                heatmaps = heatmaps.to(device, non_blocking=True)
+                # samples = samples.to(device, non_blocking=True)
+                bool_masked_pos = bool_masked_pos.to(device, non_blocking=True)
 
-            with torch.no_grad():
-                input_ids = dVAE.get_codebook_indices(heatmaps).flatten(1)
-                bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
-                labels = input_ids[bool_masked_pos]
+                with torch.no_grad():
+                    with record_function("Encoder"):
+                        input_ids = dVAE.get_codebook_indices(heatmaps).flatten(1)
+                        bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
+                        labels = input_ids[bool_masked_pos]
 
-            with torch.cuda.amp.autocast():
-                outputs = model(
-                    heatmaps,
-                    bool_masked_pos=bool_masked_pos,
-                    return_all_tokens=False,
-                )
-                loss = nn.CrossEntropyLoss()(input=outputs, target=labels)
+                with torch.cuda.amp.autocast():
+                    with record_function("BeIT"):
+                        outputs = model(
+                            heatmaps,
+                            bool_masked_pos=bool_masked_pos,
+                            return_all_tokens=False,
+                        )
+                    loss = nn.CrossEntropyLoss()(input=outputs, target=labels)
 
-            loss_value = loss.item()
+                loss_value = loss.item()
 
-            if not math.isfinite(loss_value):
-                print("Loss is {}, stopping training".format(loss_value))
-                wandb.finish()
+                if not math.isfinite(loss_value):
+                    print("Loss is {}, stopping training".format(loss_value))
+                    wandb.finish()
 
-            if using_deepspeed:
-                # Gradients are automatically zeroed after the step
-                dist_model.backward(loss)
-                dist_model.step()
-            else:
-                distr_opt.zero_grad()
-                loss.backward()
-                distr_opt.step()
+                if using_deepspeed:
+                    # Gradients are automatically zeroed after the step
+                    dist_model.backward(loss)
+                    dist_model.step()
+                else:
+                    distr_opt.zero_grad()
+                    loss.backward()
+                    distr_opt.step()
 
-            logs = {}
+                logs = {}
 
-            # lr decay
-            # Do not advance schedulers from `deepspeed_config`.
-            if not using_deepspeed_sched:
-                distr_sched.step()
+                # lr decay
+                # Do not advance schedulers from `deepspeed_config`.
+                if not using_deepspeed_sched:
+                    distr_sched.step()
 
-            # Collective loss, averaged
-            avg_loss = distr_backend.average_all(loss)
-            acc = accuracy(outputs, labels, topk=(1, 5))
+                # Collective loss, averaged
+                avg_loss = distr_backend.average_all(loss)
+                acc = accuracy(outputs, labels, topk=(1, 5))
 
-            if distr_backend.is_root_worker():
-                if i % 10 == 0:
-                    lr = distr_sched.get_last_lr()[0]
-                    # print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
+                if distr_backend.is_root_worker():
+                    if i % 10 == 0:
+                        lr = distr_sched.get_last_lr()[0]
+                        print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
 
-                    logs = {
-                        **logs,
-                        "Top-1": acc[0].item(),
-                        "Top-5": acc[1].item(),
-                        "epoch": epoch,
-                        "iter": i,
-                        "loss": avg_loss.item(),
-                        "lr": lr,
-                    }
+                        logs = {
+                            **logs,
+                            "Top-1": acc[0].item(),
+                            "Top-5": acc[1].item(),
+                            "epoch": epoch,
+                            "iter": i,
+                            "loss": avg_loss.item(),
+                            "lr": lr,
+                        }
 
-                wandb.log(logs)
-            global_step += 1
+                    wandb.log(logs)
+                global_step += 1
+
+                prof.step()
 
         if distr_backend.is_root_worker():
             # save trained model to wandb as an artifact every epoch's end

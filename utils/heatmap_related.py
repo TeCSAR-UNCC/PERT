@@ -3,14 +3,142 @@ import numpy as np
 import imgaug as ia
 import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
-import torch
-from multiprocess import Pool
-
+from multiprocessing.pool import Pool
+from functools import partial
+import time
 
 EPS = 1e-3
 
 
-def flatten_gen_heat(kps, skeletons):
+def flatten_generate_a_heatmap(sigma, arr, centers, max_values):
+    """Generate pseudo heatmap for one keypoint in one frame.
+
+    Args:
+        arr (np.ndarray): The array to store the generated heatmaps. Shape: img_h * img_w.
+        centers (np.ndarray): The coordinates of corresponding keypoints (of multiple persons). Shape: M * 2.
+        max_values (np.ndarray): The max values of each keypoint. Shape: M.
+
+    Returns:
+        np.ndarray: The generated pseudo heatmap.
+    """
+
+    img_h, img_w = arr.shape
+
+    for center, max_value in zip(centers, max_values):
+        if max_value < EPS:
+            continue
+
+        mu_x, mu_y = round(center[0]), round(center[1])
+        st_x = max(int(mu_x - 3 * sigma), 0)
+        ed_x = min(int(mu_x + 3 * sigma) + 1, img_w)
+        st_y = max(int(mu_y - 3 * sigma), 0)
+        ed_y = min(int(mu_y + 3 * sigma) + 1, img_h)
+        x = np.arange(st_x, ed_x, 1, np.float32)
+        y = np.arange(st_y, ed_y, 1, np.float32)
+
+        # if the keypoint not in the heatmap coordinate system
+        if not (len(x) and len(y)):
+            continue
+        y = y[:, None]
+
+        patch = np.exp(-((x - mu_x) ** 2 + (y - mu_y) ** 2) / 2 / sigma**2)
+        patch = patch * max_value
+        arr[st_y:ed_y, st_x:ed_x] = np.maximum(arr[st_y:ed_y, st_x:ed_x], patch)
+
+
+def fallten_generate_a_limb_heatmap(sigma, arr, starts, ends, start_values, end_values):
+    """Generate pseudo heatmap for one limb in one frame.
+
+    Args:
+        arr (np.ndarray): The array to store the generated heatmaps. Shape: img_h * img_w.
+        starts (np.ndarray): The coordinates of one keypoint in the corresponding limbs. Shape: M * 2.
+        ends (np.ndarray): The coordinates of the other keypoint in the corresponding limbs. Shape: M * 2.
+        start_values (np.ndarray): The max values of one keypoint in the corresponding limbs. Shape: M.
+        end_values (np.ndarray): The max values of the other keypoint in the corresponding limbs. Shape: M.
+
+    Returns:
+        np.ndarray: The generated pseudo heatmap.
+    """
+
+    img_h, img_w = arr.shape
+    for start, end, start_value, end_value in zip(
+        starts, ends, start_values, end_values
+    ):
+        value_coeff = min(start_value, end_value)
+        if value_coeff < EPS:
+            continue
+
+        min_x, max_x = min(start[0], end[0]), max(start[0], end[0])
+        min_y, max_y = min(start[1], end[1]), max(start[1], end[1])
+
+        min_x = max(int(min_x - 3 * sigma), 0)
+        max_x = min(int(max_x + 3 * sigma) + 1, img_w)
+        min_y = max(int(min_y - 3 * sigma), 0)
+        max_y = min(int(max_y + 3 * sigma) + 1, img_h)
+
+        x = np.arange(min_x, max_x, 1, np.float32)
+        y = np.arange(min_y, max_y, 1, np.float32)
+
+        if not (len(x) and len(y)):
+            continue
+
+        y = y[:, None]
+        x_0 = np.zeros_like(x)
+        y_0 = np.zeros_like(y)
+
+        # distance to start keypoints
+        d2_start = (x - start[0]) ** 2 + (y - start[1]) ** 2
+
+        # distance to end keypoints
+        d2_end = (x - end[0]) ** 2 + (y - end[1]) ** 2
+
+        # the distance between start and end keypoints.
+        d2_ab = (start[0] - end[0]) ** 2 + (start[1] - end[1]) ** 2
+
+        if d2_ab < 1:
+            flatten_generate_a_heatmap(sigma, arr, start[None], start_value[None])
+            continue
+
+        coeff = (d2_start - d2_end + d2_ab) / 2.0 / d2_ab
+
+        a_dominate = coeff <= 0
+        b_dominate = coeff >= 1
+        seg_dominate = 1 - a_dominate - b_dominate
+
+        position = np.stack([x + y_0, y + x_0], axis=-1)
+        projection = start + np.stack([coeff, coeff], axis=-1) * (end - start)
+        d2_line = position - projection
+        d2_line = d2_line[:, :, 0] ** 2 + d2_line[:, :, 1] ** 2
+        d2_seg = a_dominate * d2_start + b_dominate * d2_end + seg_dominate * d2_line
+
+        patch = np.exp(-d2_seg / 2.0 / sigma**2)
+        patch = patch * value_coeff
+
+        arr[min_y:max_y, min_x:max_x] = np.maximum(arr[min_y:max_y, min_x:max_x], patch)
+
+
+def flatten_generate_heatmap(data, sigma, num_c, img_h, img_w):
+    kps, max_values = data
+
+    arr = np.zeros([num_c, img_h, img_w], dtype=np.float32)
+
+    skeletons = (
+        (0, 1),
+        (0, 2),
+        (0, 3),
+        (3, 4),
+        (4, 5),
+        (0, 9),
+        (9, 10),
+        (10, 11),
+        (2, 6),
+        (2, 12),
+        (6, 7),
+        (7, 8),
+        (12, 13),
+        (13, 14),
+    )
+
     for i, limb in enumerate(skeletons):
         start_idx, end_idx = limb
         starts = kps[:, start_idx]
@@ -18,9 +146,14 @@ def flatten_gen_heat(kps, skeletons):
 
         start_values = max_values[:, start_idx]
         end_values = max_values[:, end_idx]
-        self.generate_a_limb_heatmap(arr[i], starts, ends, start_values, end_values)
+        fallten_generate_a_limb_heatmap(
+            sigma, arr[i], starts, ends, start_values, end_values
+        )
+
+    return arr
 
 
+# --------------------------------------------------------------------------------------
 class GeneratePoseTarget:
     """Generate pseudo heatmaps based on joint coordinates and confidence.
 
@@ -331,20 +464,39 @@ class GeneratePoseTarget:
         par_kps = []
         par_kpscores = []
 
+        # ----------------Pool implementation
+        """
         for i in range(num_frame):
             par_kps.append(all_kps[:, i])
             par_kpscores.append(all_kpscores[:, i])
 
-        def generate_heatmap_per_fram(fram_idx):
-            local_ret = np.zeros([num_c, new_img_h, new_img_w], dtype=np.float32)
-            self.generate_heatmap(local_ret, par_kps[fram_idx], par_kpscores[fram_idx])
-            return local_ret
+        start = time.time()
+        with Pool(60) as pool:
+            partial_filled_func = partial(
+                flatten_generate_heatmap,
+                sigma=self.sigma,
+                num_c=num_c,
+                img_h=new_img_h,
+                img_w=new_img_w,
+            )
+            data = zip(par_kps, par_kpscores)
+            par_ret = pool.map(partial_filled_func, data)
+        end = time.time()
 
-        with Pool(1) as pool:
-            all_ret = pool.map(generate_heatmap_per_fram, range(num_frame))
+        print("Elappsed time: {}ms\n".format((end - start) * 1000))
 
         for i in range(num_frame):
-            ret[i] = all_ret[i]
+            ret[i] = par_ret[i]
+        """
+        # ---------------- Endof Pool implementation
+
+        for i in range(num_frame):
+            # M, V, C
+            kps = all_kps[:, i]
+            # M, C
+            kpscores = all_kpscores[:, i]
+
+            self.generate_heatmap(ret[i], kps, kpscores)
 
         pad_size_tuple = (
             ((0, 0), (0, 0), (0, 0), (pad_size, pad_size))
@@ -371,9 +523,7 @@ class GeneratePoseTarget:
                 indices[r] = l
             heatmap_flip = heatmap[..., ::-1][:, indices]
             heatmap = np.concatenate([heatmap, heatmap_flip])
-
         combined_heatmaps = heatmap.max(axis=1)
-
         return combined_heatmaps
 
     def __repr__(self):
