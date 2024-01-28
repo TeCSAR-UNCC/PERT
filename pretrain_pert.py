@@ -265,7 +265,7 @@ def main(args):
             acc = accuracy(outputs, labels, topk=(1, 5))
 
             if distr_backend.is_root_worker():
-                if i % 10 == 0:
+                if i % 100 == 0:
                     lr = distr_sched.get_last_lr()[0]
                     # print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
 

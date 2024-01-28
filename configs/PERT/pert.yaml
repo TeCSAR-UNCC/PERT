@@ -6,11 +6,11 @@ lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-6
 max_learning_rate: 1.0e-4
-coeff_step_size_up: 0.5
-coeff_step_size_down: 2
+coeff_step_size_up: 0.16
+coeff_step_size_down: 1
 weight_decay: 0.1 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
-temp_min: 0.5 # Minimum temperature to anneal to
+temp_min: 0.1 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
 batch_size: 8
 device: 'cuda'
