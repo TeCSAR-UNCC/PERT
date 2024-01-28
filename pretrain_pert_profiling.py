@@ -159,8 +159,8 @@ def main(args):
         weight_decay=config.weight_decay,
     )
 
-    step_size_up = int(config.coeff_step_size_up * len(ds))
-    step_size_down = int(config.coeff_step_size_down * len(ds))
+    step_size_up = int(config.coeff_step_size_up * len(dl))
+    step_size_down = int(config.coeff_step_size_down * len(dl))
 
     sched = CyclicLR(
         optimizer=opt,
