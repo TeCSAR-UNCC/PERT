@@ -89,8 +89,8 @@ if distr_backend.is_root_worker():
 opt = AdamW(
     vae.parameters(), lr=config.base_learning_rate, weight_decay=config.weight_decay
 )
-step_size_up = int(config.coeff_step_size_up * len(ds))
-step_size_down = int(config.coeff_step_size_down * len(ds))
+step_size_up = int(config.coeff_step_size_up * len(dl))
+step_size_down = int(config.coeff_step_size_down * len(dl))
 # New schedular.
 sched = CyclicLR(
     optimizer=opt,
@@ -217,7 +217,7 @@ for epoch in range(config.epochs):
 
                 heatmaps_rgb = convert_to_rgb_3d(heatmaps.numpy())
                 recons_rgb = convert_to_rgb_3d(recons.numpy())
-                hard_recons_rgb = convert_to_rgb_3d(hard_recons.numpy())
+                # hard_recons_rgb = convert_to_rgb_3d(hard_recons.numpy())
                 logs = {
                     **logs,
                     "sample heatmap": wandb.Video(
@@ -226,9 +226,9 @@ for epoch in range(config.epochs):
                     "reconstructions": wandb.Video(
                         recons_rgb, fps=30, caption="reconstructions"
                     ),
-                    "hard reconstructions": wandb.Video(
-                        hard_recons_rgb, fps=30, caption="hard reconstructions"
-                    ),
+                    # "hard reconstructions": wandb.Video(
+                    #    hard_recons_rgb, fps=30, caption="hard reconstructions"
+                    # ),
                     "codebook_indices": wandb.Histogram(codes),
                     "temperature": temp,
                 }
@@ -252,7 +252,7 @@ for epoch in range(config.epochs):
         avg_loss = distr_backend.average_all(loss)
 
         if distr_backend.is_root_worker():
-            if i % 10 == 0:
+            if i % 100 == 0:
                 lr = distr_sched.get_last_lr()[0]
                 print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
 
