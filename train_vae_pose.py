@@ -86,15 +86,19 @@ if distr_backend.is_root_worker():
 
 # optimizer
 
-opt = AdamW(vae.parameters(), lr=config.base_learning_rate, weight_decay=config.weight_decay)
+opt = AdamW(
+    vae.parameters(), lr=config.base_learning_rate, weight_decay=config.weight_decay
+)
+step_size_up = int(config.coeff_step_size_up * len(ds))
+step_size_down = int(config.coeff_step_size_down * len(ds))
 # New schedular.
 sched = CyclicLR(
     optimizer=opt,
     base_lr=config.base_learning_rate,
     max_lr=config.max_learning_rate,
     mode="triangular2",
-    step_size_up=config.coeff_step_size_up * len(ds),
-    step_size_down=config.coeff_step_size_down * len(ds),
+    step_size_up=step_size_up,
+    step_size_down=step_size_down,
     cycle_momentum=False,
 )
 

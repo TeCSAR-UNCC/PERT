@@ -55,7 +55,11 @@
       "program": "train_vae_pose.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/dVAE/dVAE_2d4x_res1x.yaml"]
+      "args": ["--cfg", "configs/dVAE/dVAE_2d4x_res1x.yaml"],
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "2",
+        "WANDB_MODE": "offline"
+      }
     },
     {
       "name": "PERT_BEiT",
