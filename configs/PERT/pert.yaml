@@ -21,30 +21,32 @@ transparent: true
 # Clean up 
 deepspeed: false
 distributed_backend: false
-
-# Heatmap Generator
-Heatmap_Generator:
-  use_gaussian_score: false
-  with_limb: true
-  with_kp: false
-  heatmap_size: &hms 256 # HeatMap Size
-                                                                     
+                                                             
 
 # Dataset Settings
 DATASET:
   train_dataset: 'panoptic'
   test_dataset: 'panoptic'
   root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-    #panoptic: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-    #nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
+    # panoptic: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
+    # nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
   window_size: &dws 300 # Dataset Window Size
   frame_interval: 1
-  stride: 1
+  stride: 15
+  joint_req: 0.9
   test_subset: 'validation'
   train_subset: 'train'
-  rootIDX: 1
   camera_num: 10
   training_mode: 'pert'
+  resolution: [1080, 1920]
+
+  # Heatmap Generator
+  Heatmap_Generator:
+    use_gaussian_score: false
+    with_limb: true
+    with_kp: false
+    heatmap_size: &hms 256 # Heatmap Size
+    scaling: 0.75
 
 # Model Settings
 VAE_Params:

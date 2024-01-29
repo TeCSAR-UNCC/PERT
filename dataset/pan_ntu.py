@@ -29,15 +29,14 @@ from dataset.kalman_filter import KeypointsKalmanFilter
 from utils.heatmap_related import GeneratePoseTarget
 
 class Pan_Ntu(JointsDataset):
-    def __init__(self, cfg, image_set, is_train, **kwargs):
-        super().__init__(cfg, image_set, is_train)
+    def __init__(self, cfg, image_set, **kwargs):
+        super().__init__(cfg, **cfg.DATASET, image_set=image_set, **kwargs)
         self.joints_def = {"panoptic": pan_joints, "nturgbd": ntu_joints}
         self.joint_indices = {"panoptic": list(pan_joints.values()), "nturgbd": list(ntu_joints.values())}
 
-        self.joint_req = 0.9
         # self.num_joints = len(JOINTS_DEF)
         # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices)-1)
-        self.panoptic_heatmap = GeneratePoseTarget(**cfg.Heatmap_Generator,
+        self.panoptic_heatmap = GeneratePoseTarget(**cfg.DATASET.Heatmap_Generator,
                                                     skeletons = pan_skel,
                                                     left_kp = pan_llimb,
                                                     left_limb = pan_llimb,

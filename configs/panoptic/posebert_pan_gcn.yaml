@@ -34,6 +34,14 @@ DATASET:
   train_subset: 'train'
   rootIDX: 1
   camera_num: 10
+
+  # Heatmap Generator
+  Heatmap_Generator:
+    use_gaussian_score: false
+    with_limb: true
+    with_kp: false
+    heatmap_size: &hms 256 # HeatMap Size
+
 LOSS:
   USE_TARGET_WEIGHT: true
 TRAIN:

@@ -1,10 +1,3 @@
-# Heatmap Generator
-Heatmap_Generator:
-  use_gaussian_score: false
-  with_limb: true
-  with_kp: false
-  heatmap_size: &hms 256 # HeatMap Size
-
 # Training settings
 epochs: 20
 base_learning_rate: 1.0e-6
@@ -31,11 +24,20 @@ DATASET:
   window_size: &dws 300 # Dataset Window Size
   frame_interval: 1
   stride: 1
+  joint_req: 0.9
   test_subset: 'validation'
   train_subset: 'train'
-  rootIDX: 1
   camera_num: 10
   training_mode: 'd_vae'
+  resolution: [1080, 1920]
+
+  # Heatmap Generator
+  Heatmap_Generator:
+    use_gaussian_score: false
+    with_limb: true
+    with_kp: false
+    heatmap_size: &hms 256 # Heatmap Size
+    scaling: 0.75
 
 batch_size: 8
 

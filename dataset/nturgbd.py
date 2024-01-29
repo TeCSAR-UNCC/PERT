@@ -138,19 +138,19 @@ LEFT_LIMB = (20, 4, 5, 6, 7, 0, 12, 13, 14, 15)
 RIGHT_LIMB = (20, 8, 9, 10, 11, 0, 16, 17, 18, 19)
 
 class Nturgbd(JointsDataset):
-    def __init__(self, cfg, image_set, is_train, **kwargs):
-        super().__init__(cfg, image_set, is_train)
+    def __init__(self, cfg, image_set, **kwargs):
+        super().__init__(cfg, **cfg.DATASET, image_set=image_set, **kwargs)
         self.joints_def = JOINTS_DEF
         self.joint_indices = list(JOINTS_DEF.values())
-        self.joint_req = 0.9
-        self.heatmap_generator = GeneratePoseTarget(**cfg.Heatmap_Generator,
-                                                    skeletons = SKELETON,
-                                                    left_kp = LEFT_LIMB,
-                                                    left_limb = LEFT_LIMB,
-                                                    right_kp = RIGHT_LIMB,
-                                                    right_limb = RIGHT_LIMB
-                                                    )
-        self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
+        self.heatmap_generator = \
+        GeneratePoseTarget(**cfg.DATASET.Heatmap_Generator,
+                            skeletons = SKELETON,
+                            left_kp = LEFT_LIMB,
+                            left_limb = LEFT_LIMB,
+                            right_kp = RIGHT_LIMB,
+                            right_limb = RIGHT_LIMB,
+                            )
+        # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 
         if self.image_set == "train":
             self.sequence_list = TRAIN_LIST
@@ -335,8 +335,8 @@ class Nturgbd(JointsDataset):
 
 
 class Action_Nturgbd(Nturgbd):
-    def __init__(self, cfg, image_set, is_train, **kwargs):
-        super().__init__(cfg, image_set, is_train, **kwargs)
+    def __init__(self, cfg, image_set, **kwargs):
+        super().__init__(cfg, **cfg.DATASET, image_set=image_set, **kwargs)
 
     def __getitem__(self, index):
         idx, num_frames = self.vf[:: self.stride][index]
