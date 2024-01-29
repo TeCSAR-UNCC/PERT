@@ -115,8 +115,10 @@ if distr_backend.is_root_worker():
     )
 
     run = wandb.init(
-        project="heatmap_train_vae_window_{}_layer_{}".format(
-            config.DATASET.window_size, config.VAE_Params.num_layers
+        project="dVAE_window_{}_layer_{}_{}".format(
+            config.DATASET.window_size,
+            config.VAE_Params.num_layers,
+            config.DATASET.train_dataset,
         ),
         job_type="dVAE_model",
         config=model_config,
@@ -235,7 +237,12 @@ for epoch in range(config.epochs):
 
                 wandb.save("./vae.pt")
 
-            save_model(f"./vae.pt")
+            save_model(
+                "./vae_{}_{}.pt".format(
+                    config.DATASET.window_size,
+                    config.DATASET.train_dataset,
+                )
+            )
 
             # temperature anneal
 
