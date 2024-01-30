@@ -6,7 +6,7 @@ lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-6
 max_learning_rate: 1.0e-4
-coeff_step_size_up: 0.5
+coeff_step_size_up: 1
 coeff_step_size_down: 2
 weight_decay: 0.1 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
@@ -20,8 +20,8 @@ world_size: 2
 transparent: true 
 
 # Clean up 
-deepspeed: false
-distributed_backend: false
+deepspeed: true
+distributed_backend: true
                                                              
 
 # Dataset Settings

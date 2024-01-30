@@ -58,7 +58,7 @@ def get_model(args):
     print(f"Creating model: {args.model}")
     model = create_model(
         args.model,
-        img_size=config.Heatmap_Generator.heatmap_size,
+        img_size=config.DATASET.Heatmap_Generator.heatmap_size,
         in_chans=config.DATASET.window_size,
         pretrained=False,
         drop_path_rate=args.drop_path,
@@ -71,19 +71,35 @@ def get_model(args):
     return model
 
 
-"""
-def save_model(path, dist_model, using_deepspeed):
+def save_model(
+    path,
+    hparam,
+    using_deepspeed,
+    distr_model,
+    distr_backend,
+    model,
+):
     save_obj = {
-        "hparams": config.VAE_Params,
+        "hparams": hparam,
     }
+    print("Are we using {}".format(using_deepspeed))
+
     if using_deepspeed:
         cp_path = Path(path)
         path_sans_extension = cp_path.parent / cp_path.stem
         cp_dir = str(path_sans_extension) + "-ds-cp"
 
-        dist_model.save_checkpoint(cp_dir, client_state=save_obj)
+        distr_model.save_checkpoint(cp_dir, client_state=save_obj)
         # We do not return so we do get a "normal" checkpoint to refer to.
-"""
+
+    if not distr_backend.is_root_worker():
+        return
+
+    save_obj = {**save_obj, "weights": model.state_dict()}
+
+    torch.save(save_obj, path)
+
+    print("Model is saved")
 
 
 def main(args):
@@ -105,8 +121,8 @@ def main(args):
     patch_size = model.patch_embed.patch_size
     print("Patch size = %s" % str(patch_size))
     config.PERT.window_size = (
-        config.Heatmap_Generator.heatmap_size // patch_size[0],
-        config.Heatmap_Generator.heatmap_size // patch_size[1],
+        config.DATASET.Heatmap_Generator.heatmap_size // patch_size[0],
+        config.DATASET.Heatmap_Generator.heatmap_size // patch_size[1],
     )
     args.patch_size = patch_size
     model.to(device)
@@ -118,13 +134,12 @@ def main(args):
         distributed_utils.DeepSpeedBackend
     )
 
-    dVAE = get_dVAE(config, using_deepspeed=using_deepspeed)
+    dVAE = get_dVAE(config)
     dVAE = dVAE.to(device)
 
     # data
-    HeatPose = GeneratePoseTarget(**config.Heatmap_Generator)
     ds = eval("dataset." + config.DATASET.test_dataset)(
-        config, config.DATASET.test_subset, is_train=False, heatmap_generator=HeatPose
+        config, config.DATASET.test_subset, is_train=False
     )
 
     if distributed_utils.using_backend(distributed_utils.HorovodBackend):
@@ -212,7 +227,7 @@ def main(args):
 
         model_config = dict(
             name=args.model,
-            img_size=config.Heatmap_Generator.heatmap_size,
+            img_size=config.DATASET.Heatmap_Generator.heatmap_size,
             in_chans=config.DATASET.window_size,
             pretrained=False,
             drop_path_rate=args.drop_path,
@@ -233,7 +248,9 @@ def main(args):
     global_step = 0
 
     for epoch in range(config.epochs):
-        for i, batch in enumerate(distr_dl):
+        # for i, batch in enumerate(distr_dl):
+        for i in range(1):
+            batch = next(iter(distr_dl))
             model.train()
 
             heatmaps, bool_masked_pos = batch
@@ -301,23 +318,39 @@ def main(args):
 
         if distr_backend.is_root_worker():
             # save trained model to wandb as an artifact every epoch's end
-
-            model_artifact = wandb.Artifact(
-                "trained-model", type="model", metadata=dict(args.model)
+            save_model(
+                "./saved_models/beit_{}.pt".format(epoch),
+                model_config,
+                using_deepspeed,
+                dist_model,
+                distr_backend,
+                model,
             )
-            model_artifact.add_file("vae.pt")
+            model_artifact = wandb.Artifact(
+                "trained-model", type="model", metadata=model_config
+            )
+            model_artifact.add_file("./saved_models/beit_{}.pt".format(epoch))
             run.log_artifact(model_artifact)
 
     if distr_backend.is_root_worker():
         # save final vae and cleanup
 
-        # save_model("./vae-final.pt")
-        wandb.save("./model-final.pt")
+        save_model(
+            "./saved_models/beit_final.pt",
+            model_config,
+            using_deepspeed,
+            dist_model,
+            distr_backend,
+            model,
+        )
+        wandb.save(
+            "./saved_models/beit_final.pt",
+        )
 
         model_artifact = wandb.Artifact(
             "trained-vae", type="model", metadata=dict(args.model)
         )
-        model_artifact.add_file("vae-final.pt")
+        model_artifact.add_file("pert-final.pt")
         run.log_artifact(model_artifact)
 
         wandb.finish()
