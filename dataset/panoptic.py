@@ -120,45 +120,45 @@ JOINTS_DEF = {
 }
 
 JOINTS_PAIRS = [
-('l-eye', 'l-ear'),
-('r-eye', 'r-ear'),
-('neck', 'nose'),
-('neck', 'l-shoulder'),
-('l-shoulder', 'l-elbow'),
-('l-elbow', 'l-wrist'),
-('neck', 'r-shoulder'),
-('r-shoulder', 'r-elbow'),
-('r-elbow', 'r-wrist'),
-('neck', 'mid-hip'),
-('mid-hip', 'l-hip'),
-('l-hip', 'l-knee'),
-('l-knee', 'l-ankle'),
-('mid-hip', 'r-hip'),
-('r-hip', 'r-knee'),
-('r-knee', 'r-ankle'),
+    ("l-eye", "l-ear"),
+    ("r-eye", "r-ear"),
+    ("neck", "nose"),
+    ("neck", "l-shoulder"),
+    ("l-shoulder", "l-elbow"),
+    ("l-elbow", "l-wrist"),
+    ("neck", "r-shoulder"),
+    ("r-shoulder", "r-elbow"),
+    ("r-elbow", "r-wrist"),
+    ("neck", "mid-hip"),
+    ("mid-hip", "l-hip"),
+    ("l-hip", "l-knee"),
+    ("l-knee", "l-ankle"),
+    ("mid-hip", "r-hip"),
+    ("r-hip", "r-knee"),
+    ("r-knee", "r-ankle"),
 ]
 
 
-SKELETON = [(JOINTS_DEF[joint1], JOINTS_DEF[joint2]) 
-            for joint1, joint2 in JOINTS_PAIRS]
+SKELETON = [(JOINTS_DEF[joint1], JOINTS_DEF[joint2]) for joint1, joint2 in JOINTS_PAIRS]
 
 LEFT_LIMB = (3, 4, 5, 6, 7, 8)
 RIGHT_LIMB = (9, 10, 11, 12, 13, 14)
 
+
 class Panoptic(JointsDataset):
-    def __init__(self, cfg, image_set, is_train, **kwargs):
-        super().__init__(cfg, image_set, is_train)
+    def __init__(self, cfg, image_set, **kwargs):
+        super().__init__(cfg, **cfg.DATASET, image_set=image_set, **kwargs)
         self.joints_def = JOINTS_DEF
         self.joint_indices = list(JOINTS_DEF.values())
-        self.joint_req = 0.9
-        self.heatmap_generator = GeneratePoseTarget(**cfg.Heatmap_Generator,
-                                                    skeletons = SKELETON,
-                                                    left_kp = LEFT_LIMB,
-                                                    left_limb = LEFT_LIMB,
-                                                    right_kp = RIGHT_LIMB,
-                                                    right_limb = RIGHT_LIMB
-                                                    )
-        self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
+        self.heatmap_generator = GeneratePoseTarget(
+            **cfg.DATASET.Heatmap_Generator,
+            skeletons=SKELETON,
+            left_kp=LEFT_LIMB,
+            left_limb=LEFT_LIMB,
+            right_kp=RIGHT_LIMB,
+            right_limb=RIGHT_LIMB,
+        )
+        # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 
         if self.image_set == "train":
             self.sequence_list = TRAIN_LIST
@@ -235,9 +235,6 @@ class Panoptic(JointsDataset):
                         pose3d = pose3d[self.joint_indices]
 
                         joints_vis = pose3d[:, -1] > 0.1
-
-                        if not joints_vis[self.root_id]:
-                            continue
 
                         # Coordinate transformation
                         M = np.array(

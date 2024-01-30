@@ -90,6 +90,15 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": ["configs/PERT/pert.yaml"]
+    },
+    {
+      "name": "profiling_dl",
+      "type": "python",
+      "request": "launch",
+      "program": "profiling_dl.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/pert.yaml"]
     }
   ]
 }

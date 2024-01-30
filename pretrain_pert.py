@@ -17,7 +17,7 @@ from pathlib import Path
 # torch
 
 import torch
-from torch.optim import AdamW
+from deepspeed.ops.lamb import FusedLamb
 from torch.optim.lr_scheduler import CyclicLR
 
 # dalle classes and utils
@@ -143,10 +143,10 @@ def main(args):
         sampler=data_sampler,
         num_workers=8,
         pin_memory=True,
-        persistent_workers=False,
+        persistent_workers=True,
     )
 
-    opt = AdamW(
+    opt = FusedLamb(
         model.parameters(),
         lr=config.base_learning_rate,
         weight_decay=config.weight_decay,
@@ -168,7 +168,23 @@ def main(args):
     # distribute
 
     distr_backend.check_batch_size(config.batch_size)
-    deepspeed_config = {"train_batch_size": config.batch_size}
+
+    deepspeed_config = {
+        "train_batch_size": config.batch_size,
+        "fp16": {
+            "enabled": False,
+            "loss_scale": 0,
+            "loss_scale_window": 1000,
+            "initial_scale_power": 16,
+            "hysteresis": 2,
+            "min_loss_scale": 1,
+        },
+        "gradient_accumulation_steps": 1,
+        "gradient_clipping": 3.0,
+        "steps_per_print": 2000,
+        "train_micro_batch_size_per_gpu": config.batch_size // config.world_size,
+        "wall_clock_breakdown": False,
+    }
 
     (dist_model, distr_opt, distr_dl, distr_sched) = distr_backend.distribute(
         args=config,
@@ -242,7 +258,8 @@ def main(args):
 
             if not math.isfinite(loss_value):
                 print("Loss is {}, stopping training".format(loss_value))
-                wandb.finish()
+                if distr_backend.is_root_worker():
+                    wandb.finish()
 
             if using_deepspeed:
                 # Gradients are automatically zeroed after the step
@@ -265,9 +282,9 @@ def main(args):
             acc = accuracy(outputs, labels, topk=(1, 5))
 
             if distr_backend.is_root_worker():
-                if i % 100 == 0:
+                if i % 10 == 0:
                     lr = distr_sched.get_last_lr()[0]
-                    # print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
+                    print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
 
                     logs = {
                         **logs,

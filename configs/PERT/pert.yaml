@@ -6,45 +6,48 @@ lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-6
 max_learning_rate: 1.0e-4
-coeff_step_size_up: 0.16
-coeff_step_size_down: 1
+coeff_step_size_up: 0.5
+coeff_step_size_down: 2
 weight_decay: 0.1 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
-temp_min: 0.1 # Minimum temperature to anneal to
+temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
-batch_size: 8
+batch_size: 8 
 device: 'cuda'
+world_size: 2
 
 #NOTE: Not sure what it is.
 transparent: true 
 
 # Clean up 
-deepspeed: true
-distributed_backend: true
-
-# Heatmap Generator
-Heatmap_Generator:
-  use_gaussian_score: false
-  with_limb: true
-  with_kp: false
-  heatmap_size: &hms 256 # HeatMap Size
-                                                                     
+deepspeed: false
+distributed_backend: false
+                                                             
 
 # Dataset Settings
 DATASET:
   train_dataset: 'panoptic'
   test_dataset: 'panoptic'
-  root: '/home/mbaharan/'
-    #panoptic: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-    #nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
+  root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
+    # panoptic: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
+    # nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
   window_size: &dws 300 # Dataset Window Size
   frame_interval: 1
-  stride: 1
+  stride: 15
+  joint_req: 0.9
   test_subset: 'validation'
   train_subset: 'train'
-  rootIDX: 1
   camera_num: 10
   training_mode: 'pert'
+  resolution: [1080, 1920]
+
+  # Heatmap Generator
+  Heatmap_Generator:
+    use_gaussian_score: false
+    with_limb: true
+    with_kp: false
+    heatmap_size: &hms 256 # Heatmap Size
+    scaling: 0.75
 
 # Model Settings
 VAE_Params:

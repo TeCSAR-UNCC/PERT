@@ -175,7 +175,10 @@ def main(args):
     # distribute
 
     distr_backend.check_batch_size(config.batch_size)
-    deepspeed_config = {"train_batch_size": config.batch_size}
+    deepspeed_config = {
+        "train_batch_size": config.batch_size,
+        "amp": {"gradient_clipping": 1.0},
+    }
 
     (dist_model, distr_opt, distr_dl, distr_sched) = distr_backend.distribute(
         args=config,
