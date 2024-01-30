@@ -101,55 +101,55 @@ JOINTS_DEF = {
     "l-handtip": 21,
     "l-thumb": 22,
     "r-handtip": 23,
-    "r-thumb": 24
+    "r-thumb": 24,
 }
 
 JOINTS_PAIRS = [
-    ('head', 'neck'),
-    ('neck', 'spine-shoulder'),
-    ('spine-shoulder', 'spine-mid'),
-    ('spine-mid', 'spine-base'),
-    ('spine-shoulder', 'l-shoulder'),
-    ('l-shoulder', 'l-elbow'),
-    ('l-elbow', 'l-wrist'),
-    ('l-wrist', 'l-hand'),
-    ('l-hand', 'l-handtip'),
-    ('l-wrist', 'l-thumb'),
-    ('spine-shoulder', 'r-shoulder'),
-    ('r-shoulder', 'r-elbow'),
-    ('r-elbow', 'r-wrist'),
-    ('r-wrist', 'r-hand'),
-    ('r-hand', 'r-handtip'),
-    ('r-wrist', 'r-thumb'),
-    ('spine-base', 'l-hip'),
-    ('l-hip', 'l-knee'),
-    ('l-knee', 'l-ankle'),
-    ('l-ankle', 'l-foot'),
-    ('spine-base', 'r-hip'),
-    ('r-hip', 'r-knee'),
-    ('r-knee', 'r-ankle'),
-    ('r-ankle', 'r-foot')
+    ("head", "neck"),
+    ("neck", "spine-shoulder"),
+    ("spine-shoulder", "spine-mid"),
+    ("spine-mid", "spine-base"),
+    ("spine-shoulder", "l-shoulder"),
+    ("l-shoulder", "l-elbow"),
+    ("l-elbow", "l-wrist"),
+    ("l-wrist", "l-hand"),
+    ("l-hand", "l-handtip"),
+    ("l-wrist", "l-thumb"),
+    ("spine-shoulder", "r-shoulder"),
+    ("r-shoulder", "r-elbow"),
+    ("r-elbow", "r-wrist"),
+    ("r-wrist", "r-hand"),
+    ("r-hand", "r-handtip"),
+    ("r-wrist", "r-thumb"),
+    ("spine-base", "l-hip"),
+    ("l-hip", "l-knee"),
+    ("l-knee", "l-ankle"),
+    ("l-ankle", "l-foot"),
+    ("spine-base", "r-hip"),
+    ("r-hip", "r-knee"),
+    ("r-knee", "r-ankle"),
+    ("r-ankle", "r-foot"),
 ]
 
-SKELETON = [(JOINTS_DEF[joint1], JOINTS_DEF[joint2]) 
-            for joint1, joint2 in JOINTS_PAIRS]
+SKELETON = [(JOINTS_DEF[joint1], JOINTS_DEF[joint2]) for joint1, joint2 in JOINTS_PAIRS]
 
 LEFT_LIMB = (20, 4, 5, 6, 7, 0, 12, 13, 14, 15)
 RIGHT_LIMB = (20, 8, 9, 10, 11, 0, 16, 17, 18, 19)
+
 
 class Nturgbd(JointsDataset):
     def __init__(self, cfg, image_set, **kwargs):
         super().__init__(cfg, **cfg.DATASET, image_set=image_set, **kwargs)
         self.joints_def = JOINTS_DEF
         self.joint_indices = list(JOINTS_DEF.values())
-        self.heatmap_generator = \
-        GeneratePoseTarget(**cfg.DATASET.Heatmap_Generator,
-                            skeletons = SKELETON,
-                            left_kp = LEFT_LIMB,
-                            left_limb = LEFT_LIMB,
-                            right_kp = RIGHT_LIMB,
-                            right_limb = RIGHT_LIMB,
-                            )
+        self.heatmap_generator = GeneratePoseTarget(
+            **cfg.DATASET.Heatmap_Generator,
+            skeletons=SKELETON,
+            left_kp=LEFT_LIMB,
+            left_limb=LEFT_LIMB,
+            right_kp=RIGHT_LIMB,
+            right_limb=RIGHT_LIMB,
+        )
         # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 
         if self.image_set == "train":
@@ -358,8 +358,8 @@ class Action_Nturgbd(Nturgbd):
 
         data = data[start_idx : start_idx + self.window_size]
 
-        meta = self.meta.iloc[idx:idx + num_frames]
-        unq_videos = meta[['video', 'id']].drop_duplicates()
+        meta = self.meta.iloc[idx : idx + num_frames]
+        unq_videos = meta[["video", "id"]].drop_duplicates()
         cls = int(unq_videos.values[0, 0][-3:])
 
         if self.heatmap_generator is not None:
@@ -367,5 +367,5 @@ class Action_Nturgbd(Nturgbd):
 
         if self.masked_position_generator is not None:
             data = [data, self.masked_position_generator(), cls]
-        
+
         return data

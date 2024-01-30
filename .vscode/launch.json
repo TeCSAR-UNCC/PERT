@@ -74,6 +74,19 @@
       }
     },
     {
+      "name": "Profiling_PERT_BEiT",
+      "type": "python",
+      "request": "launch",
+      "program": "pretrain_pert_profiling.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/pert.yaml"],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "0,1"
+      }
+    },
+    {
       "name": "pert_config",
       "type": "python",
       "request": "launch",
@@ -81,6 +94,15 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": ["configs/PERT/pert.yaml"]
+    },
+    {
+      "name": "profiling_dl",
+      "type": "python",
+      "request": "launch",
+      "program": "profiling_dl.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/pert.yaml"]
     }
   ]
 }

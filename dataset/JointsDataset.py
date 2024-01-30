@@ -18,22 +18,22 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
+
 class JointsDataset(Dataset):
     def __init__(
         self,
         cfg,
-        root = "",
-        stride = 15,
-        joint_req = 0.9,
-        camera_num = 10,
-        window_size = 300,
-        frame_interval = 1,
-        training_mode = "",
-        image_set = "validation",
-        resolution = [1920, 1080],
+        root="",
+        stride=15,
+        joint_req=0.9,
+        camera_num=10,
+        window_size=300,
+        frame_interval=1,
+        training_mode="",
+        image_set="validation",
+        resolution=[1920, 1080],
         **kwargs,
     ):
-        
         this_dir = os.path.dirname(__file__)
         self.dataset_root = root
         if isinstance(root, str):
@@ -44,6 +44,10 @@ class JointsDataset(Dataset):
         self.stride = stride
         self.joint_req = joint_req
         self.image_set = image_set
+        self.num_views = camera_num
+        self.resolution = resolution
+        self.window_size = window_size
+        self.frame_interval = frame_interval
         self.num_views = camera_num
         self.resolution = resolution
         self.window_size = window_size
@@ -66,7 +70,6 @@ class JointsDataset(Dataset):
                 max_num_patches=cfg.PERT.max_mask_patches_per_block,
                 min_num_patches=cfg.PERT.min_mask_patches_per_block,
             )
-
 
     def __getitem__(self, index):
         idx, num_frames = self.vf[:: self.stride][index]

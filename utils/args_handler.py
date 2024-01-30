@@ -11,12 +11,12 @@ def get_args():
     parser = argparse.ArgumentParser("PERT pre-training script", add_help=False)
     config_group = parser.add_argument_group("Config")
     config_group.add_argument(
-        "--cfg", help="experiment configure file name", required=True, type=str
+        "--cfg",
+        default="configs/PERT/pert.yaml",
+        help="experiment configure file name",
+        required=False,
+        type=str,
     )
-
-    args = parser.parse_args()
-
-    update_config(args.cfg)
 
     model_group = parser.add_argument_group("Training settings")
 
@@ -87,7 +87,7 @@ def get_args():
     parser.add_argument("--no_auto_resume", action="store_false", dest="auto_resume")
     parser.set_defaults(auto_resume=True)
 
-    parser.add_argument("--num_workers", default=10, type=int)
+    parser.add_argument("--num_workers", default=32, type=int)
     parser.add_argument(
         "--pin_mem",
         action="store_true",
@@ -105,5 +105,4 @@ def get_args():
     parser.add_argument(
         "--dist_url", default="env://", help="url used to set up distributed training"
     )
-
     return parser.parse_args()

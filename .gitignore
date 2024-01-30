@@ -1,13 +1,11 @@
 # wandb
 wandb/
 
-# Saved models
-*.pt
-
 # For profiling
 Profiling/
-PeRT_trainMe_Profiling.sh
-pretrain_pert_profiling.py
+
+#saved_models
+saved_models/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

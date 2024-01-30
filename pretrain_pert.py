@@ -17,7 +17,7 @@ from pathlib import Path
 # torch
 
 import torch
-from torch.optim import AdamW
+from deepspeed.ops.lamb import FusedLamb
 from torch.optim.lr_scheduler import CyclicLR
 
 # dalle classes and utils
@@ -58,7 +58,7 @@ def get_model(args):
     print(f"Creating model: {args.model}")
     model = create_model(
         args.model,
-        img_size=config.Heatmap_Generator.heatmap_size,
+        img_size=config.DATASET.Heatmap_Generator.heatmap_size,
         in_chans=config.DATASET.window_size,
         pretrained=False,
         drop_path_rate=args.drop_path,
@@ -71,19 +71,33 @@ def get_model(args):
     return model
 
 
-"""
-def save_model(path, dist_model, using_deepspeed):
+def save_model(
+    path,
+    hparam,
+    using_deepspeed,
+    distr_model,
+    distr_backend,
+    model,
+):
     save_obj = {
-        "hparams": config.VAE_Params,
+        "hparams": hparam,
     }
-    if using_deepspeed:
+    print("Are we using {}".format(using_deepspeed))
+
+    if using_deepspeed and False:
         cp_path = Path(path)
         path_sans_extension = cp_path.parent / cp_path.stem
         cp_dir = str(path_sans_extension) + "-ds-cp"
 
-        dist_model.save_checkpoint(cp_dir, client_state=save_obj)
+        distr_model.save_checkpoint(cp_dir, client_state=save_obj)
         # We do not return so we do get a "normal" checkpoint to refer to.
-"""
+
+    if not distr_backend.is_root_worker():
+        return
+
+    save_obj = {**save_obj, "weights": model.state_dict()}
+
+    torch.save(save_obj, path)
 
 
 def main(args):
@@ -105,8 +119,8 @@ def main(args):
     patch_size = model.patch_embed.patch_size
     print("Patch size = %s" % str(patch_size))
     config.PERT.window_size = (
-        config.Heatmap_Generator.heatmap_size // patch_size[0],
-        config.Heatmap_Generator.heatmap_size // patch_size[1],
+        config.DATASET.Heatmap_Generator.heatmap_size // patch_size[0],
+        config.DATASET.Heatmap_Generator.heatmap_size // patch_size[1],
     )
     args.patch_size = patch_size
     model.to(device)
@@ -118,10 +132,8 @@ def main(args):
         distributed_utils.DeepSpeedBackend
     )
 
-    dVAE = get_dVAE(config, using_deepspeed=using_deepspeed)
-
-    if not using_deepspeed:
-        dVAE = dVAE.to(device)
+    dVAE = get_dVAE(config)
+    dVAE = dVAE.to(device)
 
     # data
     ds = eval("dataset." + config.DATASET.test_dataset)(
@@ -138,34 +150,71 @@ def main(args):
         data_sampler = None
 
     dl = DataLoader(
-        ds, config.batch_size, shuffle=not data_sampler, sampler=data_sampler
+        ds,
+        config.batch_size,
+        shuffle=not data_sampler,
+        sampler=data_sampler,
+        num_workers=8,
+        pin_memory=True,
+        persistent_workers=True,
     )
 
-    opt = AdamW(
+    opt = FusedLamb(
         model.parameters(),
         lr=config.base_learning_rate,
         weight_decay=config.weight_decay,
     )
+
+    step_size_up = int(config.coeff_step_size_up * len(dl))
+    step_size_down = int(config.coeff_step_size_down * len(dl))
 
     sched = CyclicLR(
         optimizer=opt,
         base_lr=config.base_learning_rate,
         max_lr=config.max_learning_rate,
         mode="triangular2",
-        step_size_up=config.coeff_step_size_up * len(ds),
-        step_size_down=config.coeff_step_size_down * len(ds),
+        step_size_up=step_size_up,
+        step_size_down=step_size_down,
         cycle_momentum=False,
     )
 
     # distribute
 
     distr_backend.check_batch_size(config.batch_size)
-    deepspeed_config = {"train_batch_size": config.batch_size}
+
+    deepspeed_config = {
+        "fp16": {"enabled": True},
+        "bf16": {"enabled": False},
+        "optimizer": {
+            "type": "AdamW",
+            "params": {
+                "lr": config.base_learning_rate,
+                "weight_decay": config.weight_decay,
+            },
+        },
+        "scheduler": {
+            "type": "WarmupDecayLR",
+            "params": {
+                "warmup_min_lr": config.base_learning_rate,
+                "warmup_max_lr": config.max_learning_rate,
+                "warmup_num_steps": int(config.coeff_step_size_up * len(dl)),
+                "total_num_steps": len(dl),
+            },
+        },
+        "gradient_accumulation_steps": 1,
+        "gradient_clipping": 3.0,
+        "steps_per_print": 2000,
+        "train_batch_size": config.batch_size,
+        "train_micro_batch_size_per_gpu": (
+            config.batch_size // distr_backend.get_world_size()
+        ),
+        "wall_clock_breakdown": False,
+    }
 
     (dist_model, distr_opt, distr_dl, distr_sched) = distr_backend.distribute(
-        args=args,
+        args=config,
         model=model,
-        optimizer=opt,
+        optimizer=opt if not using_deepspeed else None,
         model_parameters=model.parameters(),
         training_data=ds if using_deepspeed else dl,
         lr_scheduler=sched if not using_deepspeed else None,
@@ -188,7 +237,7 @@ def main(args):
 
         model_config = dict(
             name=args.model,
-            img_size=config.Heatmap_Generator.heatmap_size,
+            img_size=config.DATASET.Heatmap_Generator.heatmap_size,
             in_chans=config.DATASET.window_size,
             pretrained=False,
             drop_path_rate=args.drop_path,
@@ -199,7 +248,7 @@ def main(args):
         )
 
         run = wandb.init(
-            project="PERT_window_{}_model_{}".format(
+            project="BEiT_window_{}_model_{}".format(
                 config.DATASET.window_size, args.model
             ),
             job_type="training",
@@ -207,6 +256,8 @@ def main(args):
         )
 
     global_step = 0
+    global_loss = float("inf")
+    global_top1 = float("-inf")
 
     for epoch in range(config.epochs):
         for i, batch in enumerate(distr_dl):
@@ -224,7 +275,9 @@ def main(args):
 
             with torch.cuda.amp.autocast():
                 outputs = model(
-                    heatmaps, bool_masked_pos=bool_masked_pos, return_all_tokens=False
+                    heatmaps,
+                    bool_masked_pos=bool_masked_pos,
+                    return_all_tokens=False,
                 )
                 loss = nn.CrossEntropyLoss()(input=outputs, target=labels)
 
@@ -232,7 +285,8 @@ def main(args):
 
             if not math.isfinite(loss_value):
                 print("Loss is {}, stopping training".format(loss_value))
-                wandb.finish()
+                if distr_backend.is_root_worker():
+                    wandb.finish()
 
             if using_deepspeed:
                 # Gradients are automatically zeroed after the step
@@ -256,7 +310,11 @@ def main(args):
 
             if distr_backend.is_root_worker():
                 if i % 10 == 0:
-                    lr = distr_sched.get_last_lr()[0]
+                    # Will be engin.step() will be ignored if the fp16 has overflow
+                    try:
+                        lr = distr_sched.get_last_lr()[0]
+                    except:
+                        lr = float("nan")
                     print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
 
                     logs = {
@@ -272,30 +330,56 @@ def main(args):
                 wandb.log(logs)
             global_step += 1
 
-        if distr_backend.is_root_worker():
-            # save trained model to wandb as an artifact every epoch's end
-
-            model_artifact = wandb.Artifact(
-                "trained-model", type="model", metadata=dict(args.model)
-            )
-            model_artifact.add_file("vae.pt")
-            run.log_artifact(model_artifact)
+            if (
+                distr_backend.is_root_worker()
+                and global_loss > loss
+                and global_top1 < acc[0].item()
+            ):
+                # save trained model to wandb as an artifact every epoch's end
+                save_model(
+                    "./saved_models/beit_{}.pt".format("best"),
+                    model_config,
+                    using_deepspeed,
+                    dist_model,
+                    distr_backend,
+                    model,
+                )
+                """
+                model_artifact = wandb.Artifact(
+                    "trained-model", type="model", metadata=model_config
+                )
+                model_artifact.add_file("./saved_models/beit_{}.pt".format(epoch))
+                run.log_artifact(model_artifact)
+                """
+                global_loss = loss
+                global_top1 = acc[0].item()
 
     if distr_backend.is_root_worker():
         # save final vae and cleanup
 
-        # save_model("./vae-final.pt")
-        wandb.save("./model-final.pt")
-
-        model_artifact = wandb.Artifact(
-            "trained-vae", type="model", metadata=dict(args.model)
+        save_model(
+            "./saved_models/beit_final.pt",
+            model_config,
+            using_deepspeed,
+            dist_model,
+            distr_backend,
+            model,
         )
-        model_artifact.add_file("vae-final.pt")
-        run.log_artifact(model_artifact)
+        wandb.save(
+            "./saved_models/beit_final.pt",
+        )
+
+        if epoch % 5 == 0:
+            model_artifact = wandb.Artifact(
+                "trained-vae", type="model", metadata=dict(args.model)
+            )
+            model_artifact.add_file("pert-final.pt")
+            run.log_artifact(model_artifact)
 
         wandb.finish()
 
 
 if __name__ == "__main__":
     args = get_args()
+    update_config(args.cfg)
     main(args)
