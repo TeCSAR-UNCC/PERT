@@ -1,0 +1,1 @@
+CPLUS_INCLUDE_PATH=/home/mbaharan/anaconda3/lib/python3.11/site-packages/nvidia/cuda_runtime/include/:/home/mbaharan/anaconda3/envs/py311/targets/x86_64-linux/include/ WANDB_MODE=offline source PeRT_trainMe.sh

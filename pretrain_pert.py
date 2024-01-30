@@ -84,7 +84,7 @@ def save_model(
     }
     print("Are we using {}".format(using_deepspeed))
 
-    if using_deepspeed:
+    if using_deepspeed and False:
         cp_path = Path(path)
         path_sans_extension = cp_path.parent / cp_path.stem
         cp_dir = str(path_sans_extension) + "-ds-cp"
@@ -98,8 +98,6 @@ def save_model(
     save_obj = {**save_obj, "weights": model.state_dict()}
 
     torch.save(save_obj, path)
-
-    print("Model is saved")
 
 
 def main(args):
@@ -185,26 +183,38 @@ def main(args):
     distr_backend.check_batch_size(config.batch_size)
 
     deepspeed_config = {
-        "train_batch_size": config.batch_size,
-        "fp16": {
-            "enabled": False,
-            "loss_scale": 0,
-            "loss_scale_window": 1000,
-            "initial_scale_power": 16,
-            "hysteresis": 2,
-            "min_loss_scale": 1,
+        "fp16": {"enabled": True},
+        "bf16": {"enabled": False},
+        "optimizer": {
+            "type": "AdamW",
+            "params": {
+                "lr": config.base_learning_rate,
+                "weight_decay": config.weight_decay,
+            },
+        },
+        "scheduler": {
+            "type": "WarmupDecayLR",
+            "params": {
+                "warmup_min_lr": config.base_learning_rate,
+                "warmup_max_lr": config.max_learning_rate,
+                "warmup_num_steps": int(config.coeff_step_size_up * len(dl)),
+                "total_num_steps": len(dl),
+            },
         },
         "gradient_accumulation_steps": 1,
         "gradient_clipping": 3.0,
         "steps_per_print": 2000,
-        "train_micro_batch_size_per_gpu": config.batch_size // config.world_size,
+        "train_batch_size": config.batch_size,
+        "train_micro_batch_size_per_gpu": (
+            config.batch_size // distr_backend.get_world_size()
+        ),
         "wall_clock_breakdown": False,
     }
 
     (dist_model, distr_opt, distr_dl, distr_sched) = distr_backend.distribute(
         args=config,
         model=model,
-        optimizer=opt,
+        optimizer=opt if not using_deepspeed else None,
         model_parameters=model.parameters(),
         training_data=ds if using_deepspeed else dl,
         lr_scheduler=sched if not using_deepspeed else None,
@@ -246,11 +256,11 @@ def main(args):
         )
 
     global_step = 0
+    global_loss = float("inf")
+    global_top1 = float("-inf")
 
     for epoch in range(config.epochs):
-        # for i, batch in enumerate(distr_dl):
-        for i in range(1):
-            batch = next(iter(distr_dl))
+        for i, batch in enumerate(distr_dl):
             model.train()
 
             heatmaps, bool_masked_pos = batch
@@ -300,7 +310,11 @@ def main(args):
 
             if distr_backend.is_root_worker():
                 if i % 10 == 0:
-                    lr = distr_sched.get_last_lr()[0]
+                    # Will be engin.step() will be ignored if the fp16 has overflow
+                    try:
+                        lr = distr_sched.get_last_lr()[0]
+                    except:
+                        lr = float("nan")
                     print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
 
                     logs = {
@@ -316,21 +330,29 @@ def main(args):
                 wandb.log(logs)
             global_step += 1
 
-        if distr_backend.is_root_worker():
-            # save trained model to wandb as an artifact every epoch's end
-            save_model(
-                "./saved_models/beit_{}.pt".format(epoch),
-                model_config,
-                using_deepspeed,
-                dist_model,
-                distr_backend,
-                model,
-            )
-            model_artifact = wandb.Artifact(
-                "trained-model", type="model", metadata=model_config
-            )
-            model_artifact.add_file("./saved_models/beit_{}.pt".format(epoch))
-            run.log_artifact(model_artifact)
+            if (
+                distr_backend.is_root_worker()
+                and global_loss > loss
+                and global_top1 < acc[0].item()
+            ):
+                # save trained model to wandb as an artifact every epoch's end
+                save_model(
+                    "./saved_models/beit_{}.pt".format("best"),
+                    model_config,
+                    using_deepspeed,
+                    dist_model,
+                    distr_backend,
+                    model,
+                )
+                """
+                model_artifact = wandb.Artifact(
+                    "trained-model", type="model", metadata=model_config
+                )
+                model_artifact.add_file("./saved_models/beit_{}.pt".format(epoch))
+                run.log_artifact(model_artifact)
+                """
+                global_loss = loss
+                global_top1 = acc[0].item()
 
     if distr_backend.is_root_worker():
         # save final vae and cleanup
@@ -347,11 +369,12 @@ def main(args):
             "./saved_models/beit_final.pt",
         )
 
-        model_artifact = wandb.Artifact(
-            "trained-vae", type="model", metadata=dict(args.model)
-        )
-        model_artifact.add_file("pert-final.pt")
-        run.log_artifact(model_artifact)
+        if epoch % 5 == 0:
+            model_artifact = wandb.Artifact(
+                "trained-vae", type="model", metadata=dict(args.model)
+            )
+            model_artifact.add_file("pert-final.pt")
+            run.log_artifact(model_artifact)
 
         wandb.finish()
 
