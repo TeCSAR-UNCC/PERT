@@ -22,6 +22,8 @@ def main():
     args = parse_args()
     device = torch.device(config.device)
 
+    train_dataset = eval('dataset.' + config.DATASET.train_dataset)(
+        config, config.DATASET.train_subset)
     test_dataset = eval('dataset.' + config.DATASET.test_dataset)(
         config, config.DATASET.test_subset)
     

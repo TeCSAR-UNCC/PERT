@@ -55,7 +55,7 @@ class MaskingGenerator:
             "---> Masking for {} out of {}. The ratio is {:.2f}".format(
                 self.num_masking_patches,
                 self.num_patches,
-                (self.num_masking_patches / self.num_patches),
+                (self.num_masking_patches), # / self.num_patches),
             )
         )
 

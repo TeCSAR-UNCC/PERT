@@ -140,6 +140,10 @@ RIGHT_LIMB = (20, 8, 9, 10, 11, 0, 16, 17, 18, 19)
 class Nturgbd(JointsDataset):
     def __init__(self, cfg, image_set, **kwargs):
         super().__init__(cfg, **cfg.DATASET, image_set=image_set, **kwargs)
+
+        # Forced Stride
+        self.stride = 1
+
         self.joints_def = JOINTS_DEF
         self.joint_indices = list(JOINTS_DEF.values())
         self.heatmap_generator = GeneratePoseTarget(
@@ -158,7 +162,7 @@ class Nturgbd(JointsDataset):
         elif self.image_set == "validation":
             self.sequence_list = VAL_LIST
 
-        self.db_file = "ts_group_{}.pkl".format(self.image_set)
+        self.db_file = "all_group_{}.pkl".format(self.image_set)
         self.db_file = os.path.join(self.dataset_root, self.db_file)
 
         if osp.exists(self.db_file):
@@ -199,28 +203,31 @@ class Nturgbd(JointsDataset):
 
             all_poses_3d = []
             frame = -1
-            for pose2d in mat["rgb_body0"]:
-                pose2d = pose2d[self.joint_indices]
+            rgb_body_keys = [key for key in mat.keys() if key.startswith("rgb_body")]
+            for body in rgb_body_keys:
+                for pose2d in mat[body]:
+                    id = int(body[-1])
+                    pose2d = pose2d[self.joint_indices]
 
-                x_check = np.bitwise_and(pose2d[:, 0] >= 0, pose2d[:, 0] <= width - 1)
-                y_check = np.bitwise_and(pose2d[:, 1] >= 0, pose2d[:, 1] <= height - 1)
+                    x_check = np.bitwise_and(pose2d[:, 0] >= 0, pose2d[:, 0] <= width - 1)
+                    y_check = np.bitwise_and(pose2d[:, 1] >= 0, pose2d[:, 1] <= height - 1)
 
-                joints_vis = np.bitwise_and(x_check, y_check)
+                    joints_vis = np.bitwise_and(x_check, y_check)
 
-                vis_perc = np.sum(joints_vis) / len(joints_vis)
+                    vis_perc = np.sum(joints_vis) / len(joints_vis)
 
-                if vis_perc <= self.joint_req:
-                    continue
+                    if vis_perc <= self.joint_req:
+                        continue
 
-                if np.sum(pose2d) == 0.0:
-                    continue
+                    if np.sum(pose2d) == 0.0:
+                        continue
 
-                frame += 1
-                if len(pose2d) > 0:
-                    video = tfile.split(".")[0]
-                    db.append(
-                        {"frame": frame, "video": video, "joints_2d": pose2d, "id": 0}
-                    )
+                    frame += 1
+                    if len(pose2d) > 0:
+                        video = tfile.split(".")[0]
+                        db.append(
+                            {"frame": frame, "video": video, "joints_2d": pose2d, "id": id}
+                        )
 
         frames_from_end = -1
 
@@ -336,7 +343,8 @@ class Nturgbd(JointsDataset):
 
 class Action_Nturgbd(Nturgbd):
     def __init__(self, cfg, image_set, **kwargs):
-        super().__init__(cfg, **cfg.DATASET, image_set=image_set, **kwargs)
+        super().__init__(cfg, image_set=image_set, **kwargs)
+        self.vf = np.array([index for index in self.vf if self.meta.loc[index[0], 'id'] == 0])
 
     def __getitem__(self, index):
         idx, num_frames = self.vf[:: self.stride][index]
