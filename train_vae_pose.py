@@ -135,7 +135,7 @@ deepspeed_config = {"train_batch_size": config.batch_size}
     optimizer=opt,
     model_parameters=vae.parameters(),
     training_data=ds if using_deepspeed else dl,
-    lr_scheduler=sched if not using_deepspeed else None,
+    lr_scheduler=sched,  # if not using_deepspeed else None,
     config_params=deepspeed_config,
 )
 
@@ -235,14 +235,12 @@ for epoch in range(config.epochs):
                     "temperature": temp,
                 }
 
-                wandb.save("./vae.pt")
-
-            save_model(
-                "./vae_{}_{}.pt".format(
-                    config.DATASET.window_size,
-                    config.DATASET.train_dataset,
+                save_model(
+                    "./vae_{}_{}.pt".format(
+                        config.DATASET.window_size,
+                        config.DATASET.train_dataset,
+                    )
                 )
-            )
 
             # temperature anneal
 
@@ -280,7 +278,12 @@ for epoch in range(config.epochs):
         model_artifact = wandb.Artifact(
             "trained-vae", type="model", metadata=dict(model_config)
         )
-        model_artifact.add_file("vae.pt")
+        model_artifact.add_file(
+            "./vae_{}_{}.pt".format(
+                config.DATASET.window_size,
+                config.DATASET.train_dataset,
+            )
+        )
         run.log_artifact(model_artifact)
 
 if distr_backend.is_root_worker():

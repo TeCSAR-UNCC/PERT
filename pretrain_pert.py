@@ -82,7 +82,7 @@ def save_model(
     save_obj = {
         "hparams": hparam,
     }
-    print("Are we using {}".format(using_deepspeed))
+    print("Saved at {}".format(path))
 
     if using_deepspeed and False:
         cp_path = Path(path)
@@ -192,15 +192,6 @@ def main(args):
                 "weight_decay": config.weight_decay,
             },
         },
-        "scheduler": {
-            "type": "WarmupDecayLR",
-            "params": {
-                "warmup_min_lr": config.base_learning_rate,
-                "warmup_max_lr": config.max_learning_rate,
-                "warmup_num_steps": int(config.coeff_step_size_up * len(dl)),
-                "total_num_steps": len(dl),
-            },
-        },
         "gradient_accumulation_steps": 1,
         "gradient_clipping": 3.0,
         "steps_per_print": 2000,
@@ -217,7 +208,7 @@ def main(args):
         optimizer=opt if not using_deepspeed else None,
         model_parameters=model.parameters(),
         training_data=ds if using_deepspeed else dl,
-        lr_scheduler=sched if not using_deepspeed else None,
+        lr_scheduler=sched,  # if not using_deepspeed else None,
         config_params=deepspeed_config,
     )
 
@@ -229,6 +220,12 @@ def main(args):
         # We are using a DeepSpeed LR scheduler and want to let DeepSpeed
         # handle its scheduling.
         using_deepspeed_sched = True
+
+    print(
+        " We are using DeepSpeed Schedular {} and it is {}".format(
+            using_deepspeed_sched, distr_sched
+        )
+    )
 
     if distr_backend.is_root_worker():
         # weights & biases experiment tracking
@@ -257,7 +254,6 @@ def main(args):
 
     global_step = 0
     global_loss = float("inf")
-    global_top1 = float("-inf")
 
     for epoch in range(config.epochs):
         for i, batch in enumerate(distr_dl):
@@ -330,14 +326,16 @@ def main(args):
                 wandb.log(logs)
             global_step += 1
 
-            if (
-                distr_backend.is_root_worker()
-                and global_loss > loss
-                and global_top1 < acc[0].item()
-            ):
+            if distr_backend.is_root_worker() and global_loss > loss:
                 # save trained model to wandb as an artifact every epoch's end
+
+                print(
+                    "-> Saving model for acc: {:.2f} and loss: {:.2f}".format(
+                        acc[0].item(), avg_loss.item()
+                    )
+                )
                 save_model(
-                    "./saved_models/beit_{}.pt".format("best"),
+                    "./saved_models/beit_best_{}.pt".format(run.name),
                     model_config,
                     using_deepspeed,
                     dist_model,
@@ -352,13 +350,12 @@ def main(args):
                 run.log_artifact(model_artifact)
                 """
                 global_loss = loss
-                global_top1 = acc[0].item()
 
     if distr_backend.is_root_worker():
         # save final vae and cleanup
 
         save_model(
-            "./saved_models/beit_final.pt",
+            "./saved_models/beit_final_{}.pt".format(run.name),
             model_config,
             using_deepspeed,
             dist_model,
@@ -366,7 +363,7 @@ def main(args):
             model,
         )
         wandb.save(
-            "./saved_models/beit_final.pt",
+            "./saved_models/beit_final.pt".format(run.name),
         )
 
         if epoch % 5 == 0:

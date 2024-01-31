@@ -51,6 +51,14 @@ class MaskingGenerator:
         max_aspect = max_aspect or 1 / min_aspect
         self.log_aspect_ratio = (math.log(min_aspect), math.log(max_aspect))
 
+        print(
+            "---> Masking for {} out of {}. The ratio is {:.2f}".format(
+                self.num_masking_patches,
+                self.num_patches,
+                (self.num_masking_patches / self.num_patches),
+            )
+        )
+
     def __repr__(self):
         repr_str = "Generator(%d, %d -> [%d ~ %d], max = %d, %.3f ~ %.3f)" % (
             self.height,

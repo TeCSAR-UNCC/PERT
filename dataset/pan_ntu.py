@@ -61,7 +61,7 @@ class Pan_Ntu(JointsDataset):
             right_limb=pan_rlimb
         )
         self.nturgbd_heatmap = GeneratePoseTarget(
-            **cfg.Heatmap_Generator,
+            **cfg.DATASET.Heatmap_Generator,
             skeletons=ntu_skel,
             left_kp=ntu_llimb,
             left_limb=ntu_llimb,
