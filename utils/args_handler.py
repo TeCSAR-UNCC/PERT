@@ -12,7 +12,7 @@ def get_args():
     config_group = parser.add_argument_group("Config")
     config_group.add_argument(
         "--cfg",
-        default="configs/PERT/pert.yaml",
+        default="configs/PERT/PEiT_panntu.yaml",
         help="experiment configure file name",
         required=False,
         type=str,

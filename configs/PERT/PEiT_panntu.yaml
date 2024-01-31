@@ -25,11 +25,11 @@ distributed_backend: true
 
 # Dataset Settings
 DATASET:
-  train_dataset: 'nturgbd'
-  test_dataset: 'nturgbd'
-  root: '/mnt/DATASETS_RAID_28TB/nturgbd/'
-    # panoptic: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-    # nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
+  train_dataset: 'pan_ntu'
+  test_dataset: 'pan_ntu'
+  root: # '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
+    panoptic: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
+    nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
   window_size: &dws 300 # Dataset Window Size
   frame_interval: 1
   stride: 15

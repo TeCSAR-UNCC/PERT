@@ -122,6 +122,7 @@ if distr_backend.is_root_worker():
         ),
         job_type="dVAE_model",
         config=model_config,
+        mode='offline'
     )
 
 # distribute

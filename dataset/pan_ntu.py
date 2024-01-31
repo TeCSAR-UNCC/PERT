@@ -116,7 +116,7 @@ class Pan_Ntu(JointsDataset):
     def __getitem__(self, index):
         idx, num_frames = self.vf[:: self.stride][index]
 
-        if index < self.panoptic_len:
+        if index < self.panoptic_len // self.stride:
             db = self.db_pan
             heatmap_generator = self.panoptic_heatmap
         else:

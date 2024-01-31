@@ -19,7 +19,7 @@
       "program": "view_frames.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/pert.yaml"],
+      "args": ["--cfg", "configs/PERT/PEiT_panntu.yaml"],
       "env": {
         "WANDB_MODE": "offline",
         "CUDA_VISIBLE_DEVICES": "2"
@@ -32,7 +32,7 @@
       "program": "testing_things.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/pert.yaml"]
+      "args": ["--cfg", "configs/PERT/PEiT_panntu.yaml"]
     },
     {
       "name": "dVAE",
@@ -43,7 +43,7 @@
       "justMyCode": true,
       "args": ["--cfg", "configs/dVAE/dVAE_2d4x_res1x.yaml"],
       "env": {
-        "CUDA_VISIBLE_DEVICES": "2",
+        "CUDA_VISIBLE_DEVICES": "1",
         "WANDB_MODE": "offline"
       }
     },
@@ -54,7 +54,7 @@
       "program": "pretrain_pert.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/pert.yaml"],
+      "args": ["--cfg", "configs/PERT/PEiT_panntu.yaml"],
       "env": {
         "WANDB_MODE": "offline"
       }
@@ -66,7 +66,7 @@
       "program": "pretrain_pert_profiling.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/pert.yaml"],
+      "args": ["--cfg", "configs/PERT/PEiT_panntu.yaml"],
       "env": {
         "WANDB_MODE": "offline",
         "CUDA_VISIBLE_DEVICES": "0,1"
@@ -79,7 +79,7 @@
       "program": "./configs/config.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["configs/PERT/pert.yaml"]
+      "args": ["configs/PERT/PEiT_panntu.yaml"]
     },
     {
       "name": "profiling_dl",
@@ -88,7 +88,7 @@
       "program": "profiling_dl.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/pert.yaml"]
+      "args": ["--cfg", "configs/PERT/PEiT_panntu.yaml"]
     }
   ]
 }
