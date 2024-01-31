@@ -13,31 +13,17 @@
       "justMyCode": true
     },
     {
-      "name": "pert_train_ntu",
-      "type": "python",
-      "request": "launch",
-      "program": "train_2d.py",
-      "console": "integratedTerminal",
-      "justMyCode": true,
-      "args": ["--cfg", "configs/nturgbd/pert12_h5_ntu.yaml"]
-    },
-    {
-      "name": "poseBert_emd Train",
-      "type": "python",
-      "request": "launch",
-      "program": "train_2d.py",
-      "console": "integratedTerminal",
-      "justMyCode": true,
-      "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
-    },
-    {
       "name": "view_frames",
       "type": "python",
       "request": "launch",
       "program": "view_frames.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/panoptic/posebert_pan_gcn.yaml"]
+      "args": ["--cfg", "configs/PERT/pert.yaml"],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "2"
+      }
     },
     {
       "name": "Heatmap generator",
