@@ -25,9 +25,9 @@ distributed_backend: true
 
 # Dataset Settings
 DATASET:
-  train_dataset: 'nturgbd'
-  test_dataset: 'nturgbd'
-  root: '/mnt/DATASETS_RAID_28TB/nturgbd/'
+  train_dataset: 'panoptic'
+  test_dataset: 'panoptic'
+  root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
     # panoptic: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
     # nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
   window_size: &dws 300 # Dataset Window Size
@@ -64,8 +64,7 @@ VAE_Params:
 Pretrained_Models:
   discrete_vae_weight_path: './saved_models/vae.pt'
   PERT:
-    path_folder: './saved_models/pert/'
-    prefix_saved_file: 'pert_iter_{}.pt'
+    prefix_saved_file: './saved_models/beit_best_efficient-smoke-26.pt'
 
 PERT:
   window_size:

@@ -4,6 +4,9 @@ wandb/
 # For profiling
 Profiling/
 
+# Debugging
+configs/PERT/pert_debug.yaml
+
 #saved_models
 saved_models/
 

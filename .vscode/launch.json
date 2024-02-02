@@ -6,7 +6,7 @@
   "configurations": [
     {
       "name": "Python: Current File",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal",
@@ -14,7 +14,7 @@
     },
     {
       "name": "view_frames",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "view_frames.py",
       "console": "integratedTerminal",
@@ -26,8 +26,21 @@
       }
     },
     {
+      "name": "beit_view_frames",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "view_frames_beit.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/pert.yaml"],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "1"
+      }
+    },
+    {
       "name": "Heatmap generator",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "testing_things.py",
       "console": "integratedTerminal",
@@ -36,7 +49,7 @@
     },
     {
       "name": "dVAE",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "train_vae_pose.py",
       "console": "integratedTerminal",
@@ -49,19 +62,19 @@
     },
     {
       "name": "PERT_BEiT",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "pretrain_pert.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/pert.yaml"],
+      "args": ["--cfg", "configs/PERT/pert_debug.yaml"],
       "env": {
         "WANDB_MODE": "offline"
       }
     },
     {
       "name": "Profiling_PERT_BEiT",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "pretrain_pert_profiling.py",
       "console": "integratedTerminal",
@@ -74,7 +87,7 @@
     },
     {
       "name": "pert_config",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "./configs/config.py",
       "console": "integratedTerminal",
@@ -83,7 +96,7 @@
     },
     {
       "name": "profiling_dl",
-      "type": "python",
+      "type": "debugpy",
       "request": "launch",
       "program": "profiling_dl.py",
       "console": "integratedTerminal",

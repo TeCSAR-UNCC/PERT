@@ -32,6 +32,7 @@ class JointsDataset(Dataset):
         training_mode="",
         image_set="validation",
         resolution=[1920, 1080],
+        is_training=True,
         **kwargs,
     ):
         this_dir = os.path.dirname(__file__)
@@ -66,7 +67,7 @@ class JointsDataset(Dataset):
         if self.training_mode == "pert":
             self.masked_position_generator = MaskingGenerator(
                 cfg.PERT.window_size,
-                num_masking_patches=cfg.PERT.num_mask_patches,
+                num_masking_patches=cfg.PERT.num_mask_patches if is_training else 0,
                 max_num_patches=cfg.PERT.max_mask_patches_per_block,
                 min_num_patches=cfg.PERT.min_mask_patches_per_block,
             )
