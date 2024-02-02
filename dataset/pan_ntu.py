@@ -50,9 +50,8 @@ class Pan_Ntu(JointsDataset):
             "nturgbd": list(ntu_joints.values()),
         }
 
-        # self.num_joints = len(JOINTS_DEF)
-        # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices)-1)
-        self.panoptic_heatmap = GeneratePoseTarget(
+        self.heatmap_generator = {}
+        self.heatmap_generator["panoptic"] = GeneratePoseTarget(
             **cfg.DATASET.Heatmap_Generator,
             skeletons=pan_skel,
             left_kp=pan_llimb,
@@ -60,7 +59,7 @@ class Pan_Ntu(JointsDataset):
             right_kp=pan_rlimb,
             right_limb=pan_rlimb
         )
-        self.nturgbd_heatmap = GeneratePoseTarget(
+        self.heatmap_generator["nturgbd"] = GeneratePoseTarget(
             **cfg.DATASET.Heatmap_Generator,
             skeletons=ntu_skel,
             left_kp=ntu_llimb,
@@ -68,7 +67,6 @@ class Pan_Ntu(JointsDataset):
             right_kp=ntu_rlimb,
             right_limb=ntu_rlimb
         )
-        self.heatmap_generator = True
 
         self.cam_list = [(0, i) for i in pan_cam]
         self.num_views = len(self.cam_list)
@@ -84,47 +82,49 @@ class Pan_Ntu(JointsDataset):
                 "ts_group_{}_cam{}.pkl".format(self.image_set, self.num_views),
             ),
             "nturgbd": os.path.join(
-                self.dataset_root["nturgbd"], "ts_group_{}.pkl".format(self.image_set)
+                self.dataset_root["nturgbd"], "all_group_{}.pkl".format(self.image_set)
             ),
         }
+
+        self.vf = {}
+        self.db = {}
+        self.meta = {}
+        self.lengths = {}
 
         if osp.exists(self.db_file["panoptic"]) and osp.exists(self.db_file["nturgbd"]):
             # Panoptic db Loading
             info = pickle.load(open(self.db_file["panoptic"], "rb"))
             assert info["sequence_list"] == self.sequence_list["panoptic"]
             assert info["cam_list"] == self.cam_list
-            self.vf = info["valid_frames"]
-            self.db_pan = info["data"]
-            self.meta = info["meta"]
-            self.panoptic_len = len(self.vf) - 1
+            self.vf["panoptic"] = info["valid_frames"]
+            self.db["panoptic"] = info["data"]
+            self.meta["panoptic"] = info["meta"]
+            self.lengths["panoptic"] = len(self.vf["panoptic"])
 
             # NTU db Loading
             info = pickle.load(open(self.db_file["nturgbd"], "rb"))
             assert info["sequence_list"] == self.sequence_list["nturgbd"]
-            self.vf = np.concatenate((self.vf, info["valid_frames"]), axis=0)
-            self.db_ntu = info["data"]
-            self.meta = pd.concat((self.meta, info["meta"]))
+            self.vf["nturgbd"] = info["valid_frames"]
+            self.db["nturgbd"] = info["data"]
+            self.meta["nturgbd"] = info["meta"]
+            self.lengths["nturgbd"] = len(self.vf["nturgbd"])
 
         else:
             raise Exception("Database has not been created properly, Missing files")
-
-        self.vf_size = len(self.vf)
-
+        
     def __len__(self):
-        return self.vf_size // self.stride
+        return (self.lengths["panoptic"] // self.stride) + self.lengths["nturgbd"]
 
     def __getitem__(self, index):
-        idx, num_frames = self.vf[:: self.stride][index]
 
-        if index < self.panoptic_len:
-            db = self.db_pan
-            heatmap_generator = self.panoptic_heatmap
-        else:
-            heatmap_generator = self.nturgbd_heatmap
-            db = self.db_ntu
+        if index < self.lengths["panoptic"] // self.stride:
+            dataset, stride = ("panoptic", self.stride) 
+        else: 
+            dataset, stride = ("nturgbd", 1)
+            index -= self.lengths["panoptic"] // self.stride
 
-        data = db[idx : idx + num_frames][:: self.frame_interval]
-
+        idx, num_frames = self.vf[dataset][:: stride][index]
+        data = self.db[dataset][idx : idx + num_frames][:: self.frame_interval]
         data = np.nan_to_num(data, nan=1.0)
 
         # data = self._filter_data(data)
@@ -141,8 +141,8 @@ class Pan_Ntu(JointsDataset):
 
         data = data[start_idx : start_idx + self.window_size]
 
-        if heatmap_generator is not None:
-            data = heatmap_generator(np.expand_dims(data, axis=0))
+        if self.heatmap_generator[dataset] is not None:
+            data = self.heatmap_generator[dataset](np.expand_dims(data, axis=0))
 
         if self.masked_position_generator is not None:
             data = [data, self.masked_position_generator()]

@@ -6,6 +6,7 @@ Hacked together by / Copyright 2020 Ross Wightman
 
 Modified by Hangbo Bao, for generating the masked position for visual image transformer
 """
+
 # --------------------------------------------------------
 # BEIT: BERT Pre-Training of Image Transformers (https://arxiv.org/abs/2106.08254)
 # Github source: https://github.com/microsoft/unilm/tree/master/beit
