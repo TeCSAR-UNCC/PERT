@@ -36,7 +36,7 @@ DATASET:
   train_subset: 'train'
   camera_num: 10
   training_mode: 'fine-tuning'
-  resolution: [1080, 1920]
+  resolution: [1920, 1080]
   num_classes: 120
 
   # Heatmap Generator

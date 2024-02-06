@@ -3,12 +3,9 @@ import cv2
 from configs.config import config
 import torch
 from configs.config import update_config
-from bert_pytorch import BERT, PoseBERT
-from bert_pytorch import BERTTrainer
 import dataset
 import numpy as np
 from utils import view_skeleton_batch
-from train_2d import load_latest_model, return_dataloaders
 from utils.heatmap_related import GeneratePoseTarget
 
 

@@ -54,7 +54,6 @@ class JointsDataset(Dataset):
         self.window_size = window_size
         self.frame_interval = frame_interval
         self.num_views = camera_num
-        self.resolution = resolution
         self.window_size = window_size
         self.frame_interval = frame_interval
         self.total_window = self.window_size * self.frame_interval
@@ -79,6 +78,7 @@ class JointsDataset(Dataset):
     def __getitem__(self, index):
         idx, num_frames = self.vf[:: self.stride][index]
         data = self.db[idx : idx + num_frames][:: self.frame_interval]
+        data = data
 
         data = np.nan_to_num(data, nan=1.0)
 

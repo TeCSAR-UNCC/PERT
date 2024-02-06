@@ -38,7 +38,7 @@ DATASET:
   train_subset: 'train'
   camera_num: 10
   training_mode: 'pert'
-  resolution: [1080, 1920]
+  resolution: [1920, 1080]
 
   # Heatmap Generator
   Heatmap_Generator:
@@ -64,7 +64,7 @@ VAE_Params:
 Pretrained_Models:
   discrete_vae_weight_path: './saved_models/vae.pt'
   PERT:
-    prefix_saved_file: './saved_models/beit_best.pt'
+    prefix_saved_file: '/mnt/DATASETS_RAID_28TB/saved_models/beit_best.pt'
 
 PERT:
   window_size:

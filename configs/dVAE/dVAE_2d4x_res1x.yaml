@@ -29,7 +29,7 @@ DATASET:
   train_subset: 'train'
   camera_num: 10
   training_mode: 'd_vae'
-  resolution: [1080, 1920]
+  resolution: [1920, 1080]
 
   # Heatmap Generator
   Heatmap_Generator:

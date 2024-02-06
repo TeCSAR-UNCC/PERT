@@ -118,8 +118,10 @@ class Pan_Ntu(JointsDataset):
     def __getitem__(self, index):
 
         if index < self.lengths["panoptic"] // self.stride:
+            center_idx = pan_joints["mid-hip"]
             dataset, stride = ("panoptic", self.stride) 
         else: 
+            center_idx = ntu_joints["spine-base"]
             dataset, stride = ("nturgbd", 1)
             index -= self.lengths["panoptic"] // self.stride
 
@@ -128,6 +130,11 @@ class Pan_Ntu(JointsDataset):
         data = np.nan_to_num(data, nan=1.0)
 
         # data = self._filter_data(data)
+        # Center Skeletons
+        data = data - np.median(data[:, center_idx, :], axis=0)
+        data = data + (np.array(self.resolution) / 2) 
+        top = self.resolution[1] * 0.9
+        data = data * (top / data[:,:,1].max())
 
         # Select random sequence of frames
         start_idx = 0
