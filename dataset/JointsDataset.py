@@ -30,7 +30,6 @@ class JointsDataset(Dataset):
         window_size=300,
         frame_interval=1,
         training_mode="",
-        image_set="validation",
         resolution=[1920, 1080],
         is_training=True,
         **kwargs,
@@ -44,7 +43,12 @@ class JointsDataset(Dataset):
         self.cfg = cfg
         self.stride = stride
         self.joint_req = joint_req
-        self.image_set = image_set
+
+        if is_training:
+            self.image_set = cfg.DATASET.train_subset
+        else:
+            self.image_set = cfg.DATASET.test_subset
+
         self.num_views = camera_num
         self.resolution = resolution
         self.window_size = window_size
@@ -57,7 +61,7 @@ class JointsDataset(Dataset):
         self.db = []
 
         self.training_mode = None
-        if training_mode.lower() in ["d_vae", "pert"]:
+        if training_mode.lower() in ["d_vae", "pert", "fine-tuning"]:
             self.training_mode = training_mode.lower()
 
         # Heatmap generator defined in child dataset class

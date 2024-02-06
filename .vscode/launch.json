@@ -86,13 +86,27 @@
       }
     },
     {
+      "name": "Fintuning_PEiT",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "finetune_peit.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/PEiT_ntu_finetune.yaml"],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "0"
+      }
+    },
+
+    {
       "name": "pert_config",
       "type": "debugpy",
       "request": "launch",
       "program": "./configs/config.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["configs/PERT/PEiT_panntu.yaml"]
+      "args": ["configs/PERT/PEiT_ntu_finetune.yaml"]
     },
     {
       "name": "profiling_dl",

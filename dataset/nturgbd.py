@@ -138,8 +138,8 @@ RIGHT_LIMB = (20, 8, 9, 10, 11, 0, 16, 17, 18, 19)
 
 
 class Nturgbd(JointsDataset):
-    def __init__(self, cfg, image_set, **kwargs):
-        super().__init__(cfg, **cfg.DATASET, image_set=image_set, **kwargs)
+    def __init__(self, cfg, **kwargs):
+        super().__init__(cfg, **cfg.DATASET, **kwargs)
 
         # Forced Stride
         self.stride = 1
@@ -209,8 +209,12 @@ class Nturgbd(JointsDataset):
                     id = int(body[-1])
                     pose2d = pose2d[self.joint_indices]
 
-                    x_check = np.bitwise_and(pose2d[:, 0] >= 0, pose2d[:, 0] <= width - 1)
-                    y_check = np.bitwise_and(pose2d[:, 1] >= 0, pose2d[:, 1] <= height - 1)
+                    x_check = np.bitwise_and(
+                        pose2d[:, 0] >= 0, pose2d[:, 0] <= width - 1
+                    )
+                    y_check = np.bitwise_and(
+                        pose2d[:, 1] >= 0, pose2d[:, 1] <= height - 1
+                    )
 
                     joints_vis = np.bitwise_and(x_check, y_check)
 
@@ -226,7 +230,12 @@ class Nturgbd(JointsDataset):
                     if len(pose2d) > 0:
                         video = tfile.split(".")[0]
                         db.append(
-                            {"frame": frame, "video": video, "joints_2d": pose2d, "id": id}
+                            {
+                                "frame": frame,
+                                "video": video,
+                                "joints_2d": pose2d,
+                                "id": id,
+                            }
                         )
 
         frames_from_end = -1
@@ -342,9 +351,12 @@ class Nturgbd(JointsDataset):
 
 
 class Action_Nturgbd(Nturgbd):
-    def __init__(self, cfg, image_set, **kwargs):
-        super().__init__(cfg, image_set=image_set, **kwargs)
-        self.vf = np.array([index for index in self.vf if self.meta.loc[index[0], 'id'] == 0])
+    def __init__(self, cfg, **kwargs):
+        super().__init__(cfg, **kwargs)
+        self.vf = np.array(
+            [index for index in self.vf if self.meta.loc[index[0], "id"] == 0]
+        )
+        self.vf_size = len(self.vf)
 
     def __getitem__(self, index):
         idx, num_frames = self.vf[:: self.stride][index]
@@ -368,12 +380,15 @@ class Action_Nturgbd(Nturgbd):
 
         meta = self.meta.iloc[idx : idx + num_frames]
         unq_videos = meta[["video", "id"]].drop_duplicates()
-        cls = int(unq_videos.values[0, 0][-3:])
+        cls = int(unq_videos.values[0, 0][-3:]) - 1
 
         if self.heatmap_generator is not None:
             data = self.heatmap_generator(np.expand_dims(data, axis=0))
 
-        if self.masked_position_generator is not None:
-            data = [data, self.masked_position_generator(), cls]
+        if self.training_mode == "fine-tuning":
+            data = [data, cls]
 
         return data
+
+    def __len__(self):
+        return self.vf_size // self.stride
