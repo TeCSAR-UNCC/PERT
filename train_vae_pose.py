@@ -61,9 +61,11 @@ distr_backend.initialize()
 
 using_deepspeed = distributed_utils.using_backend(distributed_utils.DeepSpeedBackend)
 
-ds = eval("dataset." + config.DATASET.test_dataset)(
-    config, config.DATASET.test_subset, is_train=False
+ds = eval("dataset." + config.DATASET.train_dataset)(
+    config, config.DATASET.test_subset, is_train=True
 )
+
+device = torch.device(config.device)
 
 if distributed_utils.using_backend(distributed_utils.HorovodBackend):
     data_sampler = torch.utils.data.distributed.DistributedSampler(
@@ -72,7 +74,15 @@ if distributed_utils.using_backend(distributed_utils.HorovodBackend):
 else:
     data_sampler = None
 
-dl = DataLoader(ds, config.batch_size, shuffle=not data_sampler, sampler=data_sampler)
+dl_train = DataLoader(
+    ds,
+    config.batch_size,
+    shuffle=data_sampler is None,
+    sampler=data_sampler,
+    num_workers=config.num_workers,
+    pin_memory=True,
+    persistent_workers=(config.num_workers > 0),
+)
 
 vae = DiscreteVAE(**config.VAE_Params)
 
@@ -89,8 +99,8 @@ if distr_backend.is_root_worker():
 opt = AdamW(
     vae.parameters(), lr=config.base_learning_rate, weight_decay=config.weight_decay
 )
-step_size_up = int(config.coeff_step_size_up * len(dl))
-step_size_down = int(config.coeff_step_size_down * len(dl))
+step_size_up = int(config.coeff_step_size_up * len(dl_train))
+step_size_down = int(config.coeff_step_size_down * len(dl_train))
 # New schedular.
 sched = CyclicLR(
     optimizer=opt,
@@ -127,17 +137,47 @@ if distr_backend.is_root_worker():
 # distribute
 
 distr_backend.check_batch_size(config.batch_size)
-deepspeed_config = {"train_batch_size": config.batch_size}
+deepspeed_config = {
+    "fp16": {"enabled": True},
+    "bf16": {"enabled": False},
+    "optimizer": {
+        "type": "AdamW",
+        "params": {
+            "lr": config.base_learning_rate,
+            "weight_decay": config.weight_decay,
+        },
+    },
+    "scheduler": {
+        "type": "OneCycle",
+        "params": {
+            "cycle_first_step_size": step_size_up,
+            "cycle_second_step_size": step_size_down,
+            "cycle_min_lr": config.base_learning_rate,
+            "cycle_max_lr": config.max_learning_rate,
+            "decay_lr_rate": config.lr_decay,
+        },
+    },
+    "gradient_accumulation_steps": 1,
+    "gradient_clipping": 1.0,
+    "steps_per_print": 2000,
+    "train_batch_size": config.batch_size,
+    "train_micro_batch_size_per_gpu": (
+        config.batch_size // distr_backend.get_world_size()
+    ),
+    "wall_clock_breakdown": False,
+}
 
 (distr_vae, distr_opt, distr_dl, distr_sched) = distr_backend.distribute(
-    args=args,
+    args=config,
     model=vae,
-    optimizer=opt,
+    optimizer=opt if not using_deepspeed else None,
     model_parameters=vae.parameters(),
-    training_data=ds if using_deepspeed else dl,
-    lr_scheduler=sched,  # if not using_deepspeed else None,
+    training_data=ds if using_deepspeed else dl_train,
+    lr_scheduler=sched if not using_deepspeed else None,
     config_params=deepspeed_config,
 )
+
+print("The schedular that is going to be used: {}".format(distr_sched))
 
 using_deepspeed_sched = False
 # Prefer scheduler in `deepspeed_config`.
@@ -153,10 +193,10 @@ def save_model(path):
     save_obj = {
         "hparams": config.VAE_Params,
     }
-    if using_deepspeed:
+    if False:  # using_deepspeed:
         cp_path = Path(path)
         path_sans_extension = cp_path.parent / cp_path.stem
-        cp_dir = str(path_sans_extension) + "-ds-cp"
+        cp_dir = str(path_sans_extension) + "-dvae-ds-cp"
 
         distr_vae.save_checkpoint(cp_dir, client_state=save_obj)
         # We do not return so we do get a "normal" checkpoint to refer to.
@@ -173,14 +213,16 @@ def save_model(path):
 
 global_step = 0
 temp = config.starting_temp
+global_loss = float("inf")
 
 for epoch in range(config.epochs):
     for i, heatmaps in enumerate(distr_dl):
-        heatmaps = heatmaps.cuda()
 
-        loss, recons = distr_vae(
-            heatmaps, return_loss=True, return_recons=True, temp=temp
-        )
+        heatmaps = heatmaps.to(device)
+        with torch.cuda.amp.autocast():
+            loss, recons = distr_vae(
+                heatmaps, return_loss=True, return_recons=True, temp=temp
+            )
 
         if using_deepspeed:
             # Gradients are automatically zeroed after the step
@@ -193,18 +235,26 @@ for epoch in range(config.epochs):
 
         logs = {}
 
+        # lr decay
+        # Do not advance schedulers from `deepspeed_config`.
+        if not using_deepspeed_sched:
+            distr_sched.step()
+
+        torch.distributed.barrier()
         if i % 100 == 0:
             if distr_backend.is_root_worker():
                 k = 4
 
                 with torch.no_grad():
-                    codes = vae.get_codebook_indices(heatmaps[:k])
-                    hard_recons = vae.decode(codes)
+                    with torch.cuda.amp.autocast():
+                        codes = vae.get_codebook_indices(heatmaps[:k])
+                        hard_recons = vae.decode(codes)
 
                 heatmaps, recons = map(lambda t: t[:k], (heatmaps, recons))
                 heatmaps, recons, hard_recons, codes = map(
                     lambda t: t.detach().cpu(), (heatmaps, recons, hard_recons, codes)
                 )
+
                 """
                     heatmaps, recons, hard_recons = map(
                         lambda t: make_grid(
@@ -217,8 +267,8 @@ for epoch in range(config.epochs):
                     )
                 """
 
-                heatmaps_rgb = convert_to_rgb_3d(heatmaps.numpy())
-                recons_rgb = convert_to_rgb_3d(recons.numpy())
+                heatmaps_rgb = convert_to_rgb_3d(heatmaps.numpy().astype("float32"))
+                recons_rgb = convert_to_rgb_3d(recons.numpy().astype("float32"))
                 # hard_recons_rgb = convert_to_rgb_3d(hard_recons.numpy())
                 logs = {
                     **logs,
@@ -234,30 +284,17 @@ for epoch in range(config.epochs):
                     "codebook_indices": wandb.Histogram(codes),
                     "temperature": temp,
                 }
-
-                save_model(
-                    "./vae_{}_{}.pt".format(
-                        config.DATASET.window_size,
-                        config.DATASET.train_dataset,
-                    )
-                )
-
             # temperature anneal
 
             temp = max(
                 temp * math.exp(-config.anneal_rate * global_step), config.temp_min
             )
 
-        # lr decay
-        # Do not advance schedulers from `deepspeed_config`.
-        if not using_deepspeed_sched:
-            distr_sched.step()
-
         # Collective loss, averaged
         avg_loss = distr_backend.average_all(loss)
 
         if distr_backend.is_root_worker():
-            if i % 100 == 0:
+            if i % 10 == 0:
                 lr = distr_sched.get_last_lr()[0]
                 print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
 
@@ -270,6 +307,15 @@ for epoch in range(config.epochs):
                 }
 
             wandb.log(logs)
+            file_name = "./saved_models/vae_{}_{}.pt".format(
+                config.DATASET.window_size,
+                config.DATASET.train_dataset,
+            )
+            if global_loss > avg_loss.item():
+                print("-->Saving file: {}".format(file_name))
+                save_model(file_name)
+                global_loss = avg_loss.item()
+
         global_step += 1
 
     if distr_backend.is_root_worker():
@@ -278,12 +324,12 @@ for epoch in range(config.epochs):
         model_artifact = wandb.Artifact(
             "trained-vae", type="model", metadata=dict(model_config)
         )
-        model_artifact.add_file(
-            "./vae_{}_{}.pt".format(
-                config.DATASET.window_size,
-                config.DATASET.train_dataset,
-            )
+        file_name = "./saved_models/vae_{}_{}.pt".format(
+            config.DATASET.window_size,
+            config.DATASET.train_dataset,
         )
+
+        model_artifact.add_file(file_name)
         run.log_artifact(model_artifact)
 
 if distr_backend.is_root_worker():

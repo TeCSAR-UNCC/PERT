@@ -5,8 +5,8 @@ epochs: 20
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-6
-max_learning_rate: 1.0e-3
-coeff_step_size_up: 5
+max_learning_rate: 1.0e-4
+coeff_step_size_up: 2
 coeff_step_size_down: 5
 weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
@@ -45,7 +45,7 @@ DATASET:
     with_limb: true
     with_kp: false
     heatmap_size: &hms 256 # Heatmap Size
-    scaling: 0.75
+    scaling: 1.0
 
 
 Pretrained_Models:

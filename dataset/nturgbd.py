@@ -372,18 +372,25 @@ class Action_Nturgbd(Nturgbd):
             start_idx = np.random.randint(
                 0, high=num_frames - self.window_size, size=1
             )[0]
+            data = data[start_idx : start_idx + self.window_size]
+
+            if self.heatmap_generator is not None:
+                data = self.heatmap_generator(np.expand_dims(data, axis=0))
+
         elif num_frames < self.window_size:
+
+            if self.heatmap_generator is not None:
+                data = self.heatmap_generator(np.expand_dims(data, axis=0))
+
             pad_size = ((0, self.window_size - num_frames), (0, 0), (0, 0))
             data = np.pad(data, pad_size, "constant")
-
-        data = data[start_idx : start_idx + self.window_size]
+        else:
+            if self.heatmap_generator is not None:
+                data = self.heatmap_generator(np.expand_dims(data, axis=0))
 
         meta = self.meta.iloc[idx : idx + num_frames]
         unq_videos = meta[["video", "id"]].drop_duplicates()
         cls = int(unq_videos.values[0, 0][-3:]) - 1
-
-        if self.heatmap_generator is not None:
-            data = self.heatmap_generator(np.expand_dims(data, axis=0))
 
         if self.training_mode == "fine-tuning":
             data = [data, cls]

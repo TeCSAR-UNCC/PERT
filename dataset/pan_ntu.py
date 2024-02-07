@@ -111,30 +111,30 @@ class Pan_Ntu(JointsDataset):
 
         else:
             raise Exception("Database has not been created properly, Missing files")
-        
+
     def __len__(self):
         return (self.lengths["panoptic"] // self.stride) + self.lengths["nturgbd"]
 
     def __getitem__(self, index):
 
         if index < self.lengths["panoptic"] // self.stride:
-            center_idx = pan_joints["mid-hip"]
-            dataset, stride = ("panoptic", self.stride) 
-        else: 
-            center_idx = ntu_joints["spine-base"]
+            # center_idx = pan_joints["mid-hip"]
+            dataset, stride = ("panoptic", self.stride)
+        else:
+            # center_idx = ntu_joints["spine-base"]
             dataset, stride = ("nturgbd", 1)
             index -= self.lengths["panoptic"] // self.stride
 
-        idx, num_frames = self.vf[dataset][:: stride][index]
+        idx, num_frames = self.vf[dataset][::stride][index]
         data = self.db[dataset][idx : idx + num_frames][:: self.frame_interval]
         data = np.nan_to_num(data, nan=1.0)
 
         # data = self._filter_data(data)
         # Center Skeletons
-        data = data - np.median(data[:, center_idx, :], axis=0)
-        data = data + (np.array(self.resolution) / 2) 
-        top = self.resolution[1] * 0.9
-        data = data * (top / data[:,:,1].max())
+        # data = data - np.median(data[:, center_idx, :], axis=0)
+        # data = data + (np.array(self.resolution) / 2)
+        # top = self.resolution[1] * 0.9
+        # data = data * (top / data[:,:,1].max())
 
         # Select random sequence of frames
         start_idx = 0
@@ -142,16 +142,25 @@ class Pan_Ntu(JointsDataset):
             start_idx = np.random.randint(
                 0, high=num_frames - self.window_size, size=1
             )[0]
+            data = data[start_idx : start_idx + self.window_size]
+
+            if self.heatmap_generator[dataset] is not None:
+                data = self.heatmap_generator[dataset](np.expand_dims(data, axis=0))
+
         elif num_frames < self.window_size:
+
+            if self.heatmap_generator[dataset] is not None:
+                data = self.heatmap_generator[dataset](np.expand_dims(data, axis=0))
+
             pad_size = ((0, self.window_size - num_frames), (0, 0), (0, 0))
             data = np.pad(data, pad_size, "constant")
-
-        data = data[start_idx : start_idx + self.window_size]
-
-        if self.heatmap_generator[dataset] is not None:
-            data = self.heatmap_generator[dataset](np.expand_dims(data, axis=0))
+        else:
+            if self.heatmap_generator[dataset] is not None:
+                data = self.heatmap_generator[dataset](np.expand_dims(data, axis=0))
 
         if self.masked_position_generator is not None:
             data = [data, self.masked_position_generator()]
+
+        assert data.shape[1] == 256 and data.shape[2] == 256
 
         return data

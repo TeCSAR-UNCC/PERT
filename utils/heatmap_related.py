@@ -1,11 +1,10 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import numpy as np
 import imgaug as ia
-import imgaug.augmenters as iaa
-from imgaug.augmentables import Keypoint, KeypointsOnImage
 from multiprocessing.pool import Pool
 from functools import partial
-import time
+from utils.axu import scale_and_center, scale, scale_center_per_frame
+from imgaug.augmentables import Keypoint
 
 EPS = 1e-3
 
@@ -420,34 +419,24 @@ class GeneratePoseTarget:
         all_kps[..., :2] *= self.scaling
 
         kps = [
-            KeypointsOnImage(
-                [Keypoint(x=x, y=y) for (y, x) in kps_per_image], shape=(img_h, img_w)
-            )
+            [Keypoint(x=x, y=y) for (x, y) in kps_per_image]
             for kps_per_image in all_kps[0]
         ]
 
-        scale = (
-            {"height": self.heatmap_size, "width": "keep-aspect-ratio"}
-            if (img_h > img_w)
-            else {"width": self.heatmap_size, "height": "keep-aspect-ratio"}
-        )
-
-        seq = iaa.Sequential(
-            [
-                iaa.Resize(scale),
-            ]
-        )
-
-        aug_kpt = seq(keypoints=kps)
+        aug_kpt = scale_and_center(kps, 0.8 * self.heatmap_size)
 
         for i in range(0, len(aug_kpt)):
             kp_on_image = aug_kpt[i]
             for j in range(0, len(kp_on_image)):
                 kps = kp_on_image[j]
-                all_kps[0, i, j, :] = [kps.y, kps.x]
+                # assert kps.x < self.heatmap_size
+                # assert kps.y < self.heatmap_size
+                # kps.x = min(max(kps.x, 0), self.heatmap_size - 1)
+                # kps.y = min(max(kps.y, 0), self.heatmap_size - 1)
+                all_kps[0, i, j, :] = [kps.x, kps.y]
 
         num_frame = kp_shape[1]
-        new_img_h, new_img_w = aug_kpt[0].shape
+        new_img_h, new_img_w = self.heatmap_size, self.heatmap_size  # aug_kpt[0].shape
         pad_width = new_img_h == self.heatmap_size
         pad_size = (
             (self.heatmap_size - new_img_w) // 2
@@ -498,13 +487,6 @@ class GeneratePoseTarget:
 
             self.generate_heatmap(ret[i], kps, kpscores)
 
-        pad_size_tuple = (
-            ((0, 0), (0, 0), (0, 0), (pad_size, pad_size))
-            if pad_width
-            else ((0, 0), (0, 0), (pad_size, pad_size), (0, 0))
-        )
-
-        ret = np.pad(ret, pad_size_tuple, "constant", constant_values=0)
         return ret
 
     def __call__(self, results):

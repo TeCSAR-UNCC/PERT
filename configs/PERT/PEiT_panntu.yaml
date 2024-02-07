@@ -5,8 +5,8 @@ epochs: 20
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-6
-max_learning_rate: 1.5e-3
-coeff_step_size_up: 0.25
+max_learning_rate: 1.5e-4
+coeff_step_size_up: 1
 coeff_step_size_down: 3
 weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
@@ -14,7 +14,7 @@ temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
 batch_size: 8 
 device: 'cuda'
-world_size: 2
+world_size: 1
 
 #NOTE: Not sure what it is.
 transparent: true 
@@ -46,7 +46,7 @@ DATASET:
     with_limb: true
     with_kp: false
     heatmap_size: &hms 256 # Heatmap Size
-    scaling: 0.75
+    scaling: 1.0
 
 # Model Settings
 VAE_Params:

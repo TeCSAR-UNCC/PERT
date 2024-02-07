@@ -359,7 +359,7 @@ def main(args):
             top5.update(reduced_acc5, heatmaps.size(0))
 
             if distr_backend.is_root_worker():
-                if i % 10 == 0:
+                if i % 100 == 0:
 
                     acc_val = [0, 0]  # validate(model, dl_val, device)
 

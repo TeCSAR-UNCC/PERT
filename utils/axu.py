@@ -4,6 +4,128 @@ import os
 import torch
 import torch.distributed as dist
 from scipy import interpolate
+import imgaug.augmenters as iaa
+from imgaug.augmentables import Keypoint, KeypointsOnImage
+
+
+def scale_center_per_frame(keypoints_frames: list[Keypoint], N: int):
+    scaled_and_centered_frames = []
+
+    for frame_kps in keypoints_frames:
+        # Calculate the bounding box for the current frame's keypoints
+        min_x = min(kp.x for kp in frame_kps)
+        max_x = max(kp.x for kp in frame_kps)
+        min_y = min(kp.y for kp in frame_kps)
+        max_y = max(kp.y for kp in frame_kps)
+
+        # Determine width and height
+        width = max_x - min_x
+        height = max_y - min_y
+
+        if width == 0 and height == 0:
+            scaled_and_centered_frames.append(frame_kps)
+            continue
+
+        # Calculate scale factor
+        scale_factor = min(N / width, N / height)
+
+        # Calculate the new scaled dimensions
+        scaled_width = width * scale_factor
+        scaled_height = height * scale_factor
+
+        # Calculate offsets for centering
+        offset_x = (N - scaled_width) / 2 - min_x * scale_factor
+        offset_y = (N - scaled_height) / 2 - min_y * scale_factor
+
+        # Apply scaling and centering
+        augmenter = iaa.Sequential(
+            [
+                iaa.Affine(scale=scale_factor),  # Scale
+                iaa.Affine(
+                    translate_px={"x": round(offset_x), "y": round(offset_y)}
+                ),  # Center
+            ]
+        )
+
+        koi = KeypointsOnImage(frame_kps, shape=(N, N))
+        koi_aug = augmenter(keypoints=koi)
+
+        scaled_and_centered_frames.append(koi_aug.keypoints)
+
+    return scaled_and_centered_frames
+
+
+def scale(keypoints_frames: list[Keypoint], N: int) -> list[Keypoint]:
+    # Calculate global bounding box across all frames
+    global_min_x = min(min(kp.x for kp in frame) for frame in keypoints_frames)
+    global_max_x = max(max(kp.x for kp in frame) for frame in keypoints_frames)
+    global_min_y = min(min(kp.y for kp in frame) for frame in keypoints_frames)
+    global_max_y = max(max(kp.y for kp in frame) for frame in keypoints_frames)
+
+    # Determine global width and height
+    global_width = global_max_x - global_min_x
+    global_height = global_max_y - global_min_y
+
+    # Calculate scale factor to fit the global bounding box within N x N frame
+    scale_factor = min(N / global_width, N / global_height)
+
+    # Apply scaling to all frames using the calculated scale factor
+    scaled_frames = []
+    for frame_kps in keypoints_frames:
+        # Apply scaling
+        augmenter = iaa.Affine(scale=scale_factor)
+        koi = KeypointsOnImage(frame_kps, shape=(N, N))
+        koi_aug = augmenter(keypoints=koi)
+
+        # Optionally ensure keypoints are within the N x N frame (might not be necessary)
+        for kp in koi_aug.keypoints:
+            kp.x = min(max(kp.x, 0), N - 1)
+            kp.y = min(max(kp.y, 0), N - 1)
+
+        scaled_frames.append(koi_aug.keypoints)
+
+    return scaled_frames
+
+
+def scale_and_center(kps: list[Keypoint], N: int) -> list[Keypoint]:
+    # Calculate global bounding box
+    for frame_kps in kps:
+        x_coordinates = [kp.x for kp in frame_kps]
+        y_coordinates = [kp.y for kp in frame_kps]
+        min_x, max_x = min(x_coordinates), max(x_coordinates)
+        min_y, max_y = min(y_coordinates), max(y_coordinates)
+
+    # Scale factor and skeleton dimensions
+    scale_factor = min(N / (max_x - min_x), N / (max_y - min_y))
+    scaled_width = (max_x - min_x) * scale_factor
+    scaled_height = (max_y - min_y) * scale_factor
+
+    # Offsets for centering
+    offset_x = (N - scaled_width) / 2 - (min_x * scale_factor)
+    offset_y = (N - scaled_height) / 2 - (min_y * scale_factor)
+    # Create an augmenter for scaling
+    augmenter = iaa.Sequential(
+        [
+            iaa.Affine(scale=scale_factor),  # Scale keypoints
+            iaa.Affine(
+                translate_px={
+                    "x": round(offset_x),
+                    "y": round(offset_y),
+                }
+            ),  # Center keypoints
+        ]
+    )
+
+    # Apply the augmentation to all frames
+    aug_kpt = []
+    for frame_kps in kps:
+        koi = KeypointsOnImage(frame_kps, shape=(N, N))  # Adjust the shape as needed
+        koi_aug = augmenter(
+            keypoints=koi,
+        )
+        aug_kpt.append(koi_aug.keypoints)
+
+    return aug_kpt
 
 
 def reduce_mean(tensor, nprocs):

@@ -1,24 +1,34 @@
+
 # Training settings
 epochs: 20
-base_learning_rate: 1.0e-6
-max_learning_rate: 4.0e-4
-device: 'cuda'
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
+anneal_rate: 0.000001 # Temperature annealing rate
+base_learning_rate: 1.0e-6
+max_learning_rate: 1.0e-4
+coeff_step_size_up: 2
+coeff_step_size_down: 5
 weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
-anneal_rate: 0.000001 # Temperature annealing rate
 num_images_save: 4 # Number of images to save
-coeff_step_size_up: 1
-coeff_step_size_down: 2
-batch_size: 8
+batch_size: &bts 8
+device: 'cuda'
+world_size: 2
+num_workers: *bts
+
+#NOTE: Not sure what it is.
+transparent: true 
+
+deepspeed: true
+distributed_backend: true
+                                                             
 
 # Dataset Settings
 DATASET:
   train_dataset: 'pan_ntu'
   test_dataset: 'pan_ntu'
-  root:
+  root: # '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
     panoptic: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
     nturgbd: '/mnt/DATASETS_RAID_28TB/nturgbd/'
   window_size: &dws 300 # Dataset Window Size
@@ -28,7 +38,7 @@ DATASET:
   test_subset: 'validation'
   train_subset: 'train'
   camera_num: 10
-  training_mode: 'd_vae'
+  training_mode: 'dvae'
   resolution: [1920, 1080]
 
   # Heatmap Generator
@@ -37,9 +47,7 @@ DATASET:
     with_limb: true
     with_kp: false
     heatmap_size: &hms 256 # Heatmap Size
-    scaling: 0.75
-
-batch_size: 8
+    scaling: 1.0
 
 # Model Settings
 VAE_Params:
@@ -49,13 +57,7 @@ VAE_Params:
   codebook_dim: 512
   hidden_dim: 256
   channels: *dws
-  num_resnet_blocks: 2 # Number of residual net blocks
+  num_resnet_blocks: 4 # Number of residual net blocks
   smooth_l1_loss: true
   kl_div_loss_weight: 0.0
   normalization: null
-  
-transparent: true 
-
-# Clean up 
-deepspeed: false
-distributed_backend: false
