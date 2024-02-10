@@ -25,16 +25,14 @@ def main():
     args = parse_args()
 
     train_dataset = eval("dataset." + config.DATASET.train_dataset)(
-        config, config.DATASET.train_subset, is_train=True
+        config, is_train=True
     )
     train_dataset = eval("dataset." + config.DATASET.test_dataset)(
-        config, config.DATASET.test_subset, is_train=False
+        config, is_train=False
     )
 
-    len(train_dataset)
-
     # vf_idx = 95000
-    vf_idx = 567922
+    vf_idx = 5724
 
     # data, gt, _, mask, meta, padding = train_dataset.__getitem__(vf_idx)
     data = train_dataset.__getitem__(vf_idx)
