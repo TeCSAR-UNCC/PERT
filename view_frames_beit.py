@@ -25,9 +25,9 @@ def get_model(args):
         init_values=args.layer_scale_init_value,
     )
 
-    if config.Pretrained_Models.PERT.prefix_saved_file != "":
+    if config.Pretrained_Models.PeIT.prefix_saved_file != "":
         state_dict = torch.load(
-            config.Pretrained_Models.PERT.prefix_saved_file, map_location="cpu"
+            config.Pretrained_Models.PeIT.prefix_saved_file, map_location="cpu"
         )["weights"]
         model.load_state_dict(state_dict)
 
@@ -45,7 +45,7 @@ def main():
 
     patch_size = beit.patch_embed.patch_size
 
-    config.PERT.window_size = (
+    config.PeIT.window_size = (
         config.DATASET.Heatmap_Generator.heatmap_size // patch_size[0],
         config.DATASET.Heatmap_Generator.heatmap_size // patch_size[1],
     )

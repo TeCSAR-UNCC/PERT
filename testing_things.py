@@ -31,8 +31,10 @@ def main():
         config, config.DATASET.test_subset, is_train=False
     )
 
+    len(train_dataset)
+
     # vf_idx = 95000
-    vf_idx = 577924
+    vf_idx = 567922
 
     # data, gt, _, mask, meta, padding = train_dataset.__getitem__(vf_idx)
     data = train_dataset.__getitem__(vf_idx)

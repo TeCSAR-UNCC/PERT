@@ -86,6 +86,13 @@ dl_train = DataLoader(
 
 vae = DiscreteVAE(**config.VAE_Params)
 
+resume = False
+if config.Resume.chk_ptn != "":
+    print("--> Loading data from: {}".format(config.Resume.chk_ptn))
+    state_dict = torch.load(config.Resume.chk_ptn, map_location="cpu")["weights"]
+    vae.load_state_dict(state_dict)
+    resume = True
+
 if not using_deepspeed:
     vae = vae.cuda()
 
@@ -133,6 +140,9 @@ if distr_backend.is_root_worker():
         job_type="dVAE_model",
         config=model_config,
     )
+
+    if resume:
+        print("--> Starting from: {}".format(config.Resume.chk_ptn))
 
 # distribute
 

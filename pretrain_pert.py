@@ -120,7 +120,7 @@ def main(args):
     model = get_model(args)
     patch_size = model.patch_embed.patch_size
     print("Patch size = %s" % str(patch_size))
-    config.PERT.window_size = (
+    config.PeIT.window_size = (
         config.DATASET.Heatmap_Generator.heatmap_size // patch_size[0],
         config.DATASET.Heatmap_Generator.heatmap_size // patch_size[1],
     )

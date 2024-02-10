@@ -6,8 +6,8 @@ lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-6
 max_learning_rate: 1.0e-4
-coeff_step_size_up: 2
-coeff_step_size_down: 5
+coeff_step_size_up: 5
+coeff_step_size_down: 10
 weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
@@ -38,21 +38,26 @@ DATASET:
   training_mode: 'fine-tuning'
   resolution: [1920, 1080]
   num_classes: 120
+  drop_frames_rate: 0.3
+  # Some of the NTU video have just around 1 second.
+  max_num_frame_rate: 0.9
+
 
   # Heatmap Generator
   Heatmap_Generator:
     use_gaussian_score: false
     with_limb: true
     with_kp: false
-    heatmap_size: &hms 256 # Heatmap Size
+    heatmap_size: &hms 128 # Heatmap Size
     scaling: 1.0
 
 
 Pretrained_Models:
   discrete_vae_weight_path: './saved_models/vae.pt'
-  PERT:
-    pretrain_saved_file: './saved_models/beit_best.pt'
-    finetune_saved_file: './saved_models/beit_finetune_best.pt'
+  pretrain_saved_file: './saved_models/beit_best.pt'
+
+PeIT:
+  finetune_saved_file: 'saved_models/beit_final_distinctive-pyramid-12_finetuning.pt'
 
 PERT:
   window_size:

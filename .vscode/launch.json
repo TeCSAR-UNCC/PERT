@@ -45,7 +45,7 @@
       "program": "testing_things.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/PEiT_panntu.yaml"]
+      "args": ["--cfg", "configs/dVAE/dVAE_2d4x_res1x.yaml"]
     },
     {
       "name": "dVAE",
@@ -85,6 +85,33 @@
         "CUDA_VISIBLE_DEVICES": "0,1"
       }
     },
+    {
+      "name": "validate_fine_tuning",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "validate_finetune_peit.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/PEiT_ntu_finetune.yaml"],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "1,2"
+      }
+    },
+    {
+      "name": "offlining_ds",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "dataset/offline_validation_ds.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/PEiT_ntu_finetune.yaml"],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "1,2"
+      }
+    },
+
     {
       "name": "pert_config",
       "type": "debugpy",

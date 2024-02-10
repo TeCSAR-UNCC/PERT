@@ -97,8 +97,8 @@ def save_model(
     torch.save(save_obj, path)
 
 
-def validate(model, dl_validation, device):
-    model.eval()  # Set the model to evaluation mode
+def validate(model_engin, dl_validation, device):
+    model_engin.eval()  # Set the model to evaluation mode
     top1_correct = 0
     top5_correct = 0
     total = 0
@@ -107,7 +107,7 @@ def validate(model, dl_validation, device):
         for i, (data, target) in enumerate(dl_validation):
             data, target = data.to(device), target.to(device)
             with torch.cuda.amp.autocast():
-                outputs = model(data)
+                outputs = model_engin(data)
             _, pred = outputs.topk(5, 1, True, True)
             pred = pred.t()
             correct = pred.eq(target.view(1, -1).expand_as(pred))
@@ -151,7 +151,7 @@ def main(args):
     fill_the_model(model, args)
     patch_size = model.patch_embed.patch_size
     print("Patch size = %s" % str(patch_size))
-    config.PERT.window_size = (
+    config.PeIT.window_size = (
         config.DATASET.Heatmap_Generator.heatmap_size // patch_size[0],
         config.DATASET.Heatmap_Generator.heatmap_size // patch_size[1],
     )
@@ -193,12 +193,12 @@ def main(args):
 
     dl_val = DataLoader(
         ds_eval,
-        1,
+        config.batch_size,
         shuffle=False,
         sampler=None,
-        num_workers=0,
+        num_workers=config.num_workers,
         pin_memory=True,
-        persistent_workers=False,
+        persistent_workers=(config.num_workers > 0),
         drop_last=False,
     )
 

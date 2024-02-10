@@ -1,2 +1,2 @@
 # PERT
-This repository contains developments of PERT.
+This repository contains developments of PeIT.

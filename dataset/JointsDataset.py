@@ -15,6 +15,7 @@ from torch.utils.data import Dataset
 import os
 from .masking_generator import MaskingGenerator
 from typing import List
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,9 @@ class JointsDataset(Dataset):
         else:
             self.image_set = cfg.DATASET.test_subset
 
+        self.drop_frames_rate = cfg.DATASET.drop_frames_rate
+        self.max_num_frame_rate = cfg.DATASET.max_num_frame_rate
+
         self.num_views = camera_num
         self.resolution = resolution
         self.window_size = window_size
@@ -69,35 +73,44 @@ class JointsDataset(Dataset):
         self.masked_position_generator = None
         if self.training_mode == "pert":
             self.masked_position_generator = MaskingGenerator(
-                cfg.PERT.window_size,
-                num_masking_patches=cfg.PERT.num_mask_patches if is_training else 0,
-                max_num_patches=cfg.PERT.max_mask_patches_per_block,
-                min_num_patches=cfg.PERT.min_mask_patches_per_block,
+                cfg.PeIT.window_size,
+                num_masking_patches=cfg.PeIT.num_mask_patches if is_training else 0,
+                max_num_patches=cfg.PeIT.max_mask_patches_per_block,
+                min_num_patches=cfg.PeIT.min_mask_patches_per_block,
             )
 
     def __getitem__(self, index):
         idx, num_frames = self.vf[:: self.stride][index]
         data = self.db[idx : idx + num_frames][:: self.frame_interval]
-        data = data
 
         data = np.nan_to_num(data, nan=1.0)
 
-        # data = self._filter_data(data)
+        end_idx = num_frames
+        if random.random() <= self.drop_frames_rate and self.training_mode:
+            # Let's drop some frame
+            cur_rate = random.uniform(0, self.max_num_frame_rate)
 
-        # Select random sequence of frames
+            end_idx = round((1 - cur_rate) * self.window_size)
+
         start_idx = 0
         if num_frames > self.window_size:
             start_idx = np.random.randint(
                 0, high=num_frames - self.window_size, size=1
             )[0]
-        elif num_frames < self.window_size:
-            pad_size = ((0, self.window_size - num_frames), (0, 0), (0, 0))
-            data = np.pad(data, pad_size, "constant")
+        # elif num_frames < self.window_size:
+        #    pad_size = ((0, self.window_size - num_frames), (0, 0), (0, 0))
+        #    data = np.pad(data, pad_size, "constant")
 
-        data = data[start_idx : start_idx + self.window_size]
+        data = data[start_idx : start_idx + end_idx]
 
         if self.heatmap_generator is not None:
             data = self.heatmap_generator(np.expand_dims(data, axis=0))
+
+        diff = self.window_size - len(data)
+
+        if diff > 0:
+            pad_size = ((0, diff), (0, 0), (0, 0))
+            data = np.pad(data, pad_size, "constant")
 
         if self.masked_position_generator is not None:
             data = [data, self.masked_position_generator()]

@@ -223,10 +223,10 @@ def load_state_dict(
 def fill_the_model(model, args):
 
     checkpoint = torch.load(
-        args.config.Pretrained_Models.PERT.pretrain_saved_file, map_location="cpu"
+        args.config.Pretrained_Models.PeIT.pretrain_saved_file, map_location="cpu"
     )["weights"]
 
-    print("Load ckpt from %s" % args.config.Pretrained_Models.PERT.pretrain_saved_file)
+    print("Load ckpt from %s" % args.config.Pretrained_Models.PeIT.pretrain_saved_file)
     checkpoint_model = None
     for model_key in args.model_key.split("|"):
         if model_key in checkpoint:
