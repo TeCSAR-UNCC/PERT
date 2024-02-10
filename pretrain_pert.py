@@ -138,9 +138,7 @@ def main(args):
     dVAE = dVAE.to(device)
 
     # data
-    ds = eval("dataset." + config.DATASET.test_dataset)(
-        config, config.DATASET.test_subset, is_train=False
-    )
+    ds = eval("dataset." + config.DATASET.test_dataset)(config, is_train=False)
 
     if distributed_utils.using_backend(distributed_utils.HorovodBackend):
         data_sampler = torch.utils.data.distributed.DistributedSampler(

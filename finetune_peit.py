@@ -167,10 +167,10 @@ def main(args):
     )
 
     # data training
-    ds_train = eval("dataset." + config.DATASET.train_dataset)(config, is_training=True)
+    ds_train = eval("dataset." + config.DATASET.train_dataset)(config, is_train=True)
 
     # data validation
-    ds_eval = eval("dataset." + config.DATASET.test_dataset)(config, is_training=False)
+    ds_eval = eval("dataset." + config.DATASET.test_dataset)(config, is_train=False)
 
     if distributed_utils.using_backend(distributed_utils.HorovodBackend):
         data_sampler = torch.utils.data.distributed.DistributedSampler(

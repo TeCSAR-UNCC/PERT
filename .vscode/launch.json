@@ -45,7 +45,7 @@
       "program": "testing_things.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/PEiT_panntu.yaml"]
+      "args": ["--cfg", "configs/PERT/PEiT_ntu_finetune.yaml"]
     },
     {
       "name": "dVAE",

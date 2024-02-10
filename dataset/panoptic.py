@@ -79,7 +79,7 @@ TRAIN_LIST = [
     "171204_pose6",
 ]
 
-VAL_LIST = [
+VALIDATION_LIST = [
     "170407_haggling_b3",
     "170407_haggling_a1",
     "170404_haggling_a2",
@@ -146,8 +146,8 @@ RIGHT_LIMB = (9, 10, 11, 12, 13, 14)
 
 
 class Panoptic(JointsDataset):
-    def __init__(self, cfg, image_set, **kwargs):
-        super().__init__(cfg, **cfg.DATASET, image_set=image_set, **kwargs)
+    def __init__(self, cfg, is_train, **kwargs):
+        super().__init__(cfg, **cfg.DATASET, is_train=is_train,  **kwargs)
         self.joints_def = JOINTS_DEF
         self.joint_indices = list(JOINTS_DEF.values())
         self.heatmap_generator = GeneratePoseTarget(
@@ -160,18 +160,12 @@ class Panoptic(JointsDataset):
         )
         # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 
-        if self.image_set == "train":
-            self.sequence_list = TRAIN_LIST
-            self._interval = 3
-            self.cam_list = [(0, i) for i in CAMERA_LIST]
-            self.num_views = len(self.cam_list)
-        elif self.image_set == "validation":
-            self.sequence_list = VAL_LIST
-            self._interval = 12
-            self.cam_list = [(0, i) for i in CAMERA_LIST]
-            self.num_views = len(self.cam_list)
+        self.sequence_list = eval(self.image_set.upper()+"_LIST")
+        self._interval = 3
+        self.cam_list = [(0, i) for i in CAMERA_LIST]
+        self.num_views = len(self.cam_list)
 
-        self.db_file = "ts_group_{}_cam{}.pkl".format(self.image_set, self.num_views)
+        self.db_file = "v3_group_{}_cam{}.pkl".format(self.image_set, self.num_views)
         self.db_file = os.path.join(self.dataset_root, self.db_file)
 
         if osp.exists(self.db_file):
@@ -204,31 +198,40 @@ class Panoptic(JointsDataset):
         for seq in tqdm(self.sequence_list, desc="Sequences", position=0):
             cameras = self._get_cam(seq)
 
-            curr_anno = osp.join(self.dataset_root, seq, "hdPose3d_stage1_coco19")
-            anno_files = sorted(glob.iglob("{:s}/*.json".format(curr_anno)))
+            curr_body_anno = osp.join(self.dataset_root, seq, "hdPose3d_stage1_coco19")
+            anno_body_files = sorted(glob.iglob("{:s}/*.json".format(curr_body_anno)))
+
+            curr_hand_anno = osp.join(self.dataset_root, seq, "hdHand3d")
+            anno_hand_files = sorted(glob.iglob("{:s}/*.json".format(curr_hand_anno)))
 
             prev_pose2d = {}
-            for i, file in tqdm(
-                enumerate(anno_files),
+            for i, (b_file, h_file) in tqdm(
+                enumerate(zip(anno_body_files, anno_hand_files)),
                 desc=f"Files in {seq}",
-                total=len(anno_files),
+                total=len(anno_body_files),
                 position=1,
                 leave=False,
             ):
                 try:
-                    with open(file) as dfile:
+                    with open(b_file) as dfile:
                         bodies = json.load(dfile)["bodies"]
+                    with open(h_file) as dfile:
+                        hands = json.load(dfile)["people"]
+
+                        
                 except:
-                    print(file)
+                    print(b_file, h_file)
+                    continue
+
                 if len(bodies) == 0:
                     continue
 
                 for k, v in cameras.items():
-                    postfix = osp.basename(file).replace("body3DScene", "")
+                    postfix = osp.basename(b_file).replace("body3DScene", "")
                     prefix = "{:02d}_{:02d}".format(k[0], k[1])
 
                     all_poses_3d = []
-                    for body in bodies:
+                    for body, hand in zip(bodies, hands):
                         full_id = f"{prefix}{body['id']}"
 
                         pose3d = np.array(body["joints19"]).reshape((-1, 4))

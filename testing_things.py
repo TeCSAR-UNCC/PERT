@@ -24,15 +24,11 @@ def parse_args():
 def main():
     args = parse_args()
 
-    train_dataset = eval("dataset." + config.DATASET.train_dataset)(
-        config, config.DATASET.train_subset, is_train=True
-    )
-    train_dataset = eval("dataset." + config.DATASET.test_dataset)(
-        config, config.DATASET.test_subset, is_train=False
-    )
+    train_dataset = eval("dataset." + config.DATASET.train_dataset)(config, is_train=True)
+    train_dataset = eval("dataset." + config.DATASET.test_dataset)(config, is_train=False)
 
     # vf_idx = 95000
-    vf_idx = 577924
+    vf_idx = 5724
 
     # data, gt, _, mask, meta, padding = train_dataset.__getitem__(vf_idx)
     data = train_dataset.__getitem__(vf_idx)

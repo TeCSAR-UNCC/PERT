@@ -21,7 +21,7 @@ from dataset.JointsDataset import JointsDataset
 from utils.transforms import projectPoints
 from dataset.panoptic import (
     TRAIN_LIST as pan_train,
-    VAL_LIST as pan_val,
+    VALIDATION_LIST as pan_val,
     CAMERA_LIST as pan_cam,
     JOINTS_DEF as pan_joints,
     SKELETON as pan_skel,
@@ -30,8 +30,8 @@ from dataset.panoptic import (
 )
 
 from dataset.nturgbd import (
-    TRAIN_LIST as ntu_train,
-    VAL_LIST as ntu_val,
+    X_SUB_TRAIN_LIST as ntu_train,
+    X_SUB_VAL_LIST as ntu_val,
     JOINTS_DEF as ntu_joints,
     SKELETON as ntu_skel,
     LEFT_LIMB as ntu_llimb,
@@ -42,8 +42,8 @@ from utils.heatmap_related import GeneratePoseTarget
 
 
 class Pan_Ntu(JointsDataset):
-    def __init__(self, cfg, image_set, **kwargs):
-        super().__init__(cfg, **cfg.DATASET, image_set=image_set, **kwargs)
+    def __init__(self, cfg, is_train, **kwargs):
+        super().__init__(cfg, **cfg.DATASET, is_train=is_train, **kwargs)
         self.joints_def = {"panoptic": pan_joints, "nturgbd": ntu_joints}
         self.joint_indices = {
             "panoptic": list(pan_joints.values()),

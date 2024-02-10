@@ -23,6 +23,8 @@ class JointsDataset(Dataset):
     def __init__(
         self,
         cfg,
+        train_subset,
+        test_subset,
         root="",
         stride=15,
         joint_req=0.9,
@@ -31,7 +33,7 @@ class JointsDataset(Dataset):
         frame_interval=1,
         training_mode="",
         resolution=[1920, 1080],
-        is_training=True,
+        is_train=True,
         **kwargs,
     ):
         this_dir = os.path.dirname(__file__)
@@ -44,10 +46,8 @@ class JointsDataset(Dataset):
         self.stride = stride
         self.joint_req = joint_req
 
-        if is_training:
-            self.image_set = cfg.DATASET.train_subset
-        else:
-            self.image_set = cfg.DATASET.test_subset
+        self.image_set = train_subset if is_train else test_subset
+        self.is_train = is_train
 
         self.num_views = camera_num
         self.resolution = resolution
@@ -70,7 +70,7 @@ class JointsDataset(Dataset):
         if self.training_mode == "pert":
             self.masked_position_generator = MaskingGenerator(
                 cfg.PERT.window_size,
-                num_masking_patches=cfg.PERT.num_mask_patches if is_training else 0,
+                num_masking_patches=cfg.PERT.num_mask_patches if is_train else 0,
                 max_num_patches=cfg.PERT.max_mask_patches_per_block,
                 min_num_patches=cfg.PERT.min_mask_patches_per_block,
             )

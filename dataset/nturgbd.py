@@ -17,63 +17,16 @@ from utils.heatmap_related import GeneratePoseTarget
 
 logger = logging.getLogger(__name__)
 
-TRAIN_LIST = [
-    1,
-    2,
-    4,
-    5,
-    8,
-    9,
-    13,
-    14,
-    15,
-    16,
-    17,
-    18,
-    19,
-    25,
-    27,
-    28,
-    31,
-    34,
-    35,
-    38,
-    45,
-    46,
-    47,
-    49,
-    50,
-    52,
-    53,
-    54,
-    55,
-    56,
-    57,
-    58,
-    59,
-    70,
-    74,
-    78,
-    80,
-    81,
-    82,
-    83,
-    84,
-    85,
-    86,
-    89,
-    91,
-    92,
-    93,
-    94,
-    95,
-    97,
-    98,
-    100,
-    103,
+X_SUB_TRAIN_LIST = [
+    1, 2, 4, 5, 8, 9, 13, 14, 15, 16, 17, 18, 19, 25, 27, 28, 31, 34, 35, 38, 45, 46, 47, 49,
+    50, 52, 53, 54, 55, 56, 57, 58, 59, 70, 74, 78, 80, 81, 82, 83, 84, 85, 86, 89, 91, 92, 93, 94, 95, 97, 98, 100, 103,
+]
+X_SETUP_TRAIN_LIST = [
+    2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32,
 ]
 
-VAL_LIST = [i for i in range(1, 121) if i not in TRAIN_LIST]
+X_SUB_VAL_LIST = [i for i in range(1, 121) if i not in X_SUB_TRAIN_LIST]
+X_SETUP_VAL_LIST = [i for i in range(1, 33) if i not in X_SETUP_TRAIN_LIST]
 
 
 JOINTS_DEF = {
@@ -138,8 +91,8 @@ RIGHT_LIMB = (20, 8, 9, 10, 11, 0, 16, 17, 18, 19)
 
 
 class Nturgbd(JointsDataset):
-    def __init__(self, cfg, **kwargs):
-        super().__init__(cfg, **cfg.DATASET, **kwargs)
+    def __init__(self, cfg, is_train, **kwargs):
+        super().__init__(cfg, **cfg.DATASET, is_train=is_train, **kwargs)
 
         # Forced Stride
         self.stride = 1
@@ -156,13 +109,12 @@ class Nturgbd(JointsDataset):
         )
         # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 
-        if self.image_set == "train":
-            self.sequence_list = TRAIN_LIST
+        self.sequence_list = eval(self.image_set.upper()+"_LIST")
+        self.eval_split = "tfile.split('P')[-1][:3]" if "sub" in self.image_set else \
+                          "tfile[1:4]"
 
-        elif self.image_set == "validation":
-            self.sequence_list = VAL_LIST
 
-        self.db_file = "all_group_{}.pkl".format(self.image_set)
+        self.db_file = "group_{}.pkl".format(self.image_set)
         self.db_file = os.path.join(self.dataset_root, self.db_file)
 
         if osp.exists(self.db_file):
@@ -190,9 +142,9 @@ class Nturgbd(JointsDataset):
         txt_files = os.listdir(os.path.join(self.dataset_root, "raw_txt"))
 
         for tfile in tqdm(txt_files, desc="NTU Text Files", position=0):
-            subject = int(tfile[1:4])
+            delimiter = int(eval(self.eval_split))
 
-            if subject not in self.sequence_list:
+            if delimiter not in self.sequence_list:
                 continue
 
             tfile_path = os.path.join(self.dataset_root, "raw_txt", tfile)
@@ -206,6 +158,9 @@ class Nturgbd(JointsDataset):
             rgb_body_keys = [key for key in mat.keys() if key.startswith("rgb_body")]
             for body in rgb_body_keys:
                 for pose2d in mat[body]:
+                    # if any(pose2d.isnan()):
+                    #     continue
+
                     id = int(body[-1])
                     pose2d = pose2d[self.joint_indices]
 
@@ -351,8 +306,8 @@ class Nturgbd(JointsDataset):
 
 
 class Action_Nturgbd(Nturgbd):
-    def __init__(self, cfg, **kwargs):
-        super().__init__(cfg, **kwargs)
+    def __init__(self, cfg, is_train, **kwargs):
+        super().__init__(cfg, is_train, **kwargs)
         self.vf = np.array(
             [index for index in self.vf if self.meta.loc[index[0], "id"] == 0]
         )
