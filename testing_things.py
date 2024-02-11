@@ -25,10 +25,10 @@ def main():
     args = parse_args()
 
     train_dataset = eval("dataset." + config.DATASET.train_dataset)(
-        config, is_train=True
+        config, is_training=True
     )
     train_dataset = eval("dataset." + config.DATASET.test_dataset)(
-        config, is_train=False
+        config, is_training=False
     )
 
     # vf_idx = 95000

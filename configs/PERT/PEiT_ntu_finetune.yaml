@@ -59,7 +59,7 @@ Pretrained_Models:
 PeIT:
   finetune_saved_file: 'saved_models/beit_final_distinctive-pyramid-12_finetuning.pt'
 
-PERT:
+PeIT:
   window_size:
     - 0
     - 0

@@ -91,8 +91,8 @@ RIGHT_LIMB = (20, 8, 9, 10, 11, 0, 16, 17, 18, 19)
 
 
 class Nturgbd(JointsDataset):
-    def __init__(self, cfg, is_train, **kwargs):
-        super().__init__(cfg, **cfg.DATASET, is_train=is_train, **kwargs)
+    def __init__(self, cfg, is_training, **kwargs):
+        super().__init__(cfg, **cfg.DATASET, is_training=is_training, **kwargs)
 
         # Forced Stride
         self.stride = 1
@@ -306,8 +306,8 @@ class Nturgbd(JointsDataset):
 
 
 class Action_Nturgbd(Nturgbd):
-    def __init__(self, cfg, is_train, **kwargs):
-        super().__init__(cfg, is_train, **kwargs)
+    def __init__(self, cfg, is_training, **kwargs):
+        super().__init__(cfg, is_training, **kwargs)
         self.vf = np.array(
             [index for index in self.vf if self.meta.loc[index[0], "id"] == 0]
         )

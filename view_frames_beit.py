@@ -50,7 +50,7 @@ def main():
         config.DATASET.Heatmap_Generator.heatmap_size // patch_size[1],
     )
 
-    test_dataset = eval("dataset." + config.DATASET.test_dataset)(config, is_train=False)
+    test_dataset = eval("dataset." + config.DATASET.test_dataset)(config, is_training=False)
 
     vf_idx = 3150
 

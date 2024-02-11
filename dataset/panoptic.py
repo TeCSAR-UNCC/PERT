@@ -117,6 +117,17 @@ JOINTS_DEF = {
     "l-ear": 16,
     "r-eye": 17,
     "r-ear": 18,
+    "l-hand": 19,
+    "l-hand-tip": 20,
+    "l-thumb": 21,
+    "r-hand": 22,
+    "r-hand-tip": 23,
+    "r-thumb": 24,
+}
+HAND_JOINTS = {
+    "hand": 9,
+    "hand-tip": 12,
+    "thumb": 4,
 }
 
 JOINTS_PAIRS = [
@@ -136,6 +147,12 @@ JOINTS_PAIRS = [
     ("mid-hip", "r-hip"),
     ("r-hip", "r-knee"),
     ("r-knee", "r-ankle"),
+    ("l-wrist", "l-hand"),
+    ("l-hand", "l-hand-tip"),
+    ("l-hand", "l-thumb"),
+    ("r-wrist", "r-hand"),
+    ("r-hand", "r-hand-tip"),
+    ("r-hand", "r-thumb")
 ]
 
 
@@ -146,9 +163,10 @@ RIGHT_LIMB = (9, 10, 11, 12, 13, 14)
 
 
 class Panoptic(JointsDataset):
-    def __init__(self, cfg, is_train, **kwargs):
-        super().__init__(cfg, **cfg.DATASET, is_train=is_train,  **kwargs)
+    def __init__(self, cfg, is_training, **kwargs):
+        super().__init__(cfg, **cfg.DATASET, is_training=is_training,  **kwargs)
         self.joints_def = JOINTS_DEF
+        self.hand_indices = list(HAND_JOINTS.values())
         self.joint_indices = list(JOINTS_DEF.values())
         self.heatmap_generator = GeneratePoseTarget(
             **cfg.DATASET.Heatmap_Generator,
@@ -232,22 +250,34 @@ class Panoptic(JointsDataset):
 
                     all_poses_3d = []
                     for body, hand in zip(bodies, hands):
+
                         full_id = f"{prefix}{body['id']}"
 
-                        pose3d = np.array(body["joints19"]).reshape((-1, 4))
-                        pose3d = pose3d[self.joint_indices]
+                        two_hands = np.ones((len(self.hand_indices) * 2, 3))
+                        if "left_hand" in hand.keys():
+                            left_hand = np.array(hand['left_hand']['landmarks']).reshape(-1, 3)
+                            two_hands[:len(self.hand_indices)] = left_hand[self.hand_indices]
 
+                        if "right_hand" in hand.keys():
+                            right_hand = np.array(hand['right_hand']['landmarks']).reshape(-1, 3)
+                            two_hands[len(self.hand_indices):] = right_hand[self.hand_indices]
+                    
+                        pose3d = np.array(body["joints19"]).reshape((-1, 4))
+                        
                         joints_vis = pose3d[:, -1] > 0.1
+
+                        pose3d = np.concatenate((pose3d[:, 0:3], two_hands))
+                        pose3d = pose3d[self.joint_indices]
 
                         # Coordinate transformation
                         M = np.array(
                             [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]]
                         )
-                        pose3d[:, 0:3] = pose3d[:, 0:3].dot(M)
+                        pose3d = pose3d.dot(M)
 
                         pose2d = np.zeros((pose3d.shape[0], 2))
                         pose2d[:, :2] = projectPoints(
-                            pose3d[:, 0:3].transpose(),
+                            pose3d.transpose(),
                             v["K"],
                             v["R"],
                             v["t"],
@@ -255,10 +285,10 @@ class Panoptic(JointsDataset):
                         ).transpose()[:, :2]
 
                         x_check = np.bitwise_and(
-                            pose2d[:, 0] >= 0, pose2d[:, 0] <= width - 1
+                            pose2d[:len(joints_vis), 0] >= 0, pose2d[:len(joints_vis), 0] <= width - 1
                         )
                         y_check = np.bitwise_and(
-                            pose2d[:, 1] >= 0, pose2d[:, 1] <= height - 1
+                            pose2d[:len(joints_vis), 1] >= 0, pose2d[:len(joints_vis), 1] <= height - 1
                         )
                         check = np.bitwise_and(x_check, y_check)
                         joints_vis[np.logical_not(check)] = 0

@@ -61,7 +61,7 @@ distr_backend.initialize()
 
 using_deepspeed = distributed_utils.using_backend(distributed_utils.DeepSpeedBackend)
 
-ds = eval("dataset." + config.DATASET.train_dataset)(config, is_train=True)
+ds = eval("dataset." + config.DATASET.train_dataset)(config, is_training=True)
 
 device = torch.device(config.device)
 
