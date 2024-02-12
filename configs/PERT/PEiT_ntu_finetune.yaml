@@ -52,6 +52,19 @@ DATASET:
     scaling: 1.0
 
 
+# Model Settings
+VAE_Params:
+  image_size: *hms
+  num_layers: 3 # Number of layers (should be 3 or above)
+  num_tokens: 8192 # Number of image tokens
+  codebook_dim: 512
+  hidden_dim: 256
+  channels: *dws
+  num_resnet_blocks: 4 # Number of residual net blocks
+  smooth_l1_loss: true
+  kl_div_loss_weight: 0.0
+  normalization: null
+
 Pretrained_Models:
   discrete_vae_weight_path: './saved_models/vae.pt'
   pretrain_saved_file: './saved_models/beit_best.pt'

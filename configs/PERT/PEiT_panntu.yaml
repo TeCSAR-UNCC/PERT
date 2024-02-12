@@ -39,19 +39,22 @@ DATASET:
   camera_num: 10
   training_mode: 'pert'
   resolution: [1920, 1080]
+  drop_frames_rate: 0.3
+  # Some of the NTU video have just around 1 second.
+  max_num_frame_rate: 0.9
 
   # Heatmap Generator
   Heatmap_Generator:
     use_gaussian_score: false
     with_limb: true
     with_kp: false
-    heatmap_size: &hms 256 # Heatmap Size
+    heatmap_size: &hms 128 # Heatmap Size
     scaling: 1.0
 
 # Model Settings
 VAE_Params:
   image_size: *hms
-  num_layers: 4 # Number of layers (should be 3 or above)
+  num_layers: 3 # Number of layers (should be 3 or above)
   num_tokens: 8192 # Number of image tokens
   codebook_dim: 512
   hidden_dim: 256
@@ -66,7 +69,7 @@ Pretrained_Models:
   PERT:
     prefix_saved_file: '/mnt/DATASETS_RAID_28TB/saved_models/beit_best.pt'
 
-PERT:
+PeIT:
   window_size:
     - 0
     - 0

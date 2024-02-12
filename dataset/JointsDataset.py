@@ -86,7 +86,11 @@ class JointsDataset(Dataset):
         data = np.nan_to_num(data, nan=1.0)
 
         end_idx = num_frames
-        if random.random() <= self.drop_frames_rate and self.training_mode:
+        if (
+            random.random() <= self.drop_frames_rate
+            and self.training_mode
+            and self.training_mode == "d_vae"
+        ):
             # Let's drop some frame
             cur_rate = random.uniform(0, self.max_num_frame_rate)
 
