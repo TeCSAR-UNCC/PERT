@@ -28,7 +28,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    train_dataset = eval("dataset." + config.DATASET.train_dataset)(config, is_train=True)
+    train_dataset = eval("dataset." + config.DATASET.train_dataset)(config, is_training=True)
 
     dl = DataLoader(
         train_dataset,

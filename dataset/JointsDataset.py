@@ -32,6 +32,8 @@ class JointsDataset(Dataset):
         frame_interval=1,
         training_mode="",
         resolution=[1920, 1080],
+        drop_frames_rate = 0.3,
+        max_num_frame_rate = 0.9,
         is_training=True,
         **kwargs,
     ):
@@ -45,13 +47,14 @@ class JointsDataset(Dataset):
         self.stride = stride
         self.joint_req = joint_req
 
+
         if is_training:
             self.image_set = cfg.DATASET.train_subset
         else:
             self.image_set = cfg.DATASET.test_subset
 
-        self.drop_frames_rate = cfg.DATASET.drop_frames_rate
-        self.max_num_frame_rate = cfg.DATASET.max_num_frame_rate
+        self.drop_frames_rate = drop_frames_rate
+        self.max_num_frame_rate = max_num_frame_rate
 
         self.num_views = camera_num
         self.resolution = resolution

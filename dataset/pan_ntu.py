@@ -42,8 +42,8 @@ from utils.heatmap_related import GeneratePoseTarget
 
 
 class Pan_Ntu(JointsDataset):
-    def __init__(self, cfg, is_train, **kwargs):
-        super().__init__(cfg, **cfg.DATASET, is_train=is_train, **kwargs)
+    def __init__(self, cfg, is_training, **kwargs):
+        super().__init__(cfg, **cfg.DATASET, is_training=is_training, **kwargs)
         self.joints_def = {"panoptic": pan_joints, "nturgbd": ntu_joints}
         self.joint_indices = {
             "panoptic": list(pan_joints.values()),
