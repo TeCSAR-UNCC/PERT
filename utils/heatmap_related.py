@@ -423,7 +423,7 @@ class GeneratePoseTarget:
             for kps_per_image in all_kps[0]
         ]
 
-        aug_kpt = scale_and_center(kps, 0.6 * self.heatmap_size)
+        aug_kpt = scale_and_center(kps, 0.5 * self.heatmap_size)
 
         for i in range(0, len(aug_kpt)):
             kp_on_image = aug_kpt[i]

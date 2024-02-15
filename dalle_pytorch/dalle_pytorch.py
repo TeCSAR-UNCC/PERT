@@ -109,13 +109,14 @@ class SharedEmbedding(nn.Embedding):
 
 
 class ResBlock(nn.Module):
-    def __init__(self, chan):
+    def __init__(self, chan, use_SiLU=True):
         super().__init__()
+        activation = nn.SiLU if use_SiLU else nn.ReLU
         self.net = nn.Sequential(
             nn.Conv2d(chan, chan, 3, padding=1),
-            nn.ReLU(),
+            activation(),
             nn.Conv2d(chan, chan, 3, padding=1),
-            nn.ReLU(),
+            activation(),
             nn.Conv2d(chan, chan, 1),
         )
 
@@ -139,12 +140,13 @@ class DiscreteVAE(nn.Module):
         reinmax=False,
         kl_div_loss_weight=0.0,
         normalization=((*((0.5,) * 3), 0), (*((0.5,) * 3), 1)),
+        use_SiLU=True,
     ):
         super().__init__()
         assert log2(image_size).is_integer(), "image size must be a power of 2"
         assert num_layers >= 1, "number of layers must be greater than or equal to 1"
         has_resblocks = num_resnet_blocks > 0
-
+        activation = nn.SiLU if use_SiLU else nn.ReLU
         self.channels = channels
         self.image_size = image_size
         self.num_tokens = num_tokens
@@ -175,19 +177,19 @@ class DiscreteVAE(nn.Module):
         for (enc_in, enc_out), (dec_in, dec_out) in zip(enc_chans_io, dec_chans_io):
             enc_layers.append(
                 nn.Sequential(
-                    nn.Conv2d(enc_in, enc_out, 4, stride=2, padding=1), nn.ReLU()
+                    nn.Conv2d(enc_in, enc_out, 4, stride=2, padding=1), activation()
                 )
             )
             dec_layers.append(
                 nn.Sequential(
                     nn.ConvTranspose2d(dec_in, dec_out, 4, stride=2, padding=1),
-                    nn.ReLU(),
+                    activation(),
                 )
             )
 
         for _ in range(num_resnet_blocks):
-            dec_layers.insert(0, ResBlock(dec_chans[1]))
-            enc_layers.append(ResBlock(enc_chans[-1]))
+            dec_layers.insert(0, ResBlock(dec_chans[1], use_SiLU))
+            enc_layers.append(ResBlock(enc_chans[-1], use_SiLU))
 
         if num_resnet_blocks > 0:
             dec_layers.insert(0, nn.Conv2d(codebook_dim, dec_chans[1], 1))

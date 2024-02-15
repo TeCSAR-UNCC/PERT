@@ -536,6 +536,28 @@ def beit_base_patch16_224(pretrained=False, **kwargs):
 
 
 @register_model
+def beit_base_patch8_224(pretrained=False, **kwargs):
+    if "pretrained_cfg" in kwargs:
+        kwargs.pop("pretrained_cfg")
+
+    if "pretrained_cfg_overlay" in kwargs:
+        kwargs.pop("pretrained_cfg_overlay")
+
+    model = VisionTransformer(
+        patch_size=8,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs,
+    )
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
 def beit_base_patch16_384(pretrained=False, **kwargs):
     model = VisionTransformer(
         img_size=384,
@@ -556,6 +578,22 @@ def beit_base_patch16_384(pretrained=False, **kwargs):
 def beit_large_patch16_224(pretrained=False, **kwargs):
     model = VisionTransformer(
         patch_size=16,
+        embed_dim=1024,
+        depth=24,
+        num_heads=16,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs,
+    )
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def beit_large_patch8_224(pretrained=False, **kwargs):
+    model = VisionTransformer(
+        patch_size=8,
         embed_dim=1024,
         depth=24,
         num_heads=16,

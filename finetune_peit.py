@@ -17,8 +17,8 @@ from pathlib import Path
 # torch
 
 import torch
-from deepspeed.ops.lamb import FusedLamb
 from torch.optim.lr_scheduler import OneCycleLR
+from torch.optim import Adam
 
 # dalle classes and utils
 
@@ -104,7 +104,7 @@ def validate(model_engin, dl_validation, device):
     total = 0
 
     with torch.no_grad():  # Disable gradient calculation
-        for i, (data, target) in enumerate(dl_validation):
+        for i, (data, _, target) in enumerate(dl_validation):
             data, target = data.to(device), target.to(device)
             with torch.cuda.amp.autocast():
                 outputs = model_engin(data)
@@ -202,7 +202,7 @@ def main(args):
         drop_last=False,
     )
 
-    opt = FusedLamb(
+    opt = Adam(
         model.parameters(),
         lr=config.base_learning_rate,
         weight_decay=config.weight_decay,
@@ -305,6 +305,7 @@ def main(args):
 
     global_step = 0
     val_top1 = 0.0
+    val_top5 = 0.0
 
     for epoch in range(config.epochs):
         top1 = AverageMeter()
@@ -312,7 +313,11 @@ def main(args):
         for i, batch in enumerate(distr_dl):
             model.train()
 
-            heatmaps, labels = batch
+            if len(batch) == 2:
+                heatmaps, labels = batch
+            else:
+                heatmaps, _, labels = batch
+
             heatmaps = heatmaps.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
 
@@ -348,10 +353,9 @@ def main(args):
             # Collective loss, averaged
             avg_loss = distr_backend.average_all(loss)
 
-            acc = accuracy(outputs, labels, topk=(1, 5))
-
             torch.distributed.barrier()
 
+            acc = accuracy(outputs, labels, topk=(1, 5))
             reduced_acc1 = reduce_mean(acc[0], nprocs)
             reduced_acc5 = reduce_mean(acc[1], nprocs)
 
@@ -359,10 +363,16 @@ def main(args):
             top5.update(reduced_acc5, heatmaps.size(0))
 
             if distr_backend.is_root_worker():
+                if i > 0 and i % 1000 == 0:
+                    start = time.time()
+                    acc_val = validate(model, dl_val, device)
+                    end = time.time()
+                    print("Validation took: {}".format(end - start))
+                else:
+                    acc_val = [val_top1, val_top5]
+
+            if distr_backend.is_root_worker():
                 if i % 100 == 0:
-
-                    acc_val = [0, 0]  # validate(model, dl_val, device)
-
                     # Will be engin.step() will be ignored if the fp16 has overflow
                     try:
                         lr = distr_sched.get_last_lr()[0]
@@ -374,8 +384,12 @@ def main(args):
                         **logs,
                         "Top-1 (Training)": top1.avg,
                         "Top-5 (Training)": top5.avg,
-                        # "Top-1 (Validation)": acc_val[0],
-                        # "Top-5 (Validation)": acc_val[1],
+                        "Max Top-1 (Validation)": (
+                            acc_val[0] if acc_val[0] > val_top1 else val_top1
+                        ),
+                        "Max Top-5 (Validation)": (
+                            acc_val[1] if acc_val[1] > val_top5 else val_top5
+                        ),
                         "epoch": epoch,
                         "iter": i,
                         "loss": avg_loss.item(),
@@ -385,7 +399,7 @@ def main(args):
                 wandb.log(logs)
             global_step += 1
 
-            if distr_backend.is_root_worker() and val_top1 < top1.avg:
+            if distr_backend.is_root_worker() and val_top1 < acc_val[0]:
                 # save trained model to wandb as an artifact every epoch's end
 
                 print("-> Saving model for acc: {:.2f} ".format(top1.avg))
@@ -405,7 +419,8 @@ def main(args):
                 # ),
                 # run.log_artifact(model_artifact)
 
-                val_top1 = top1.avg
+                val_top1 = acc_val[0]
+                val_top5 = acc_val[1]
 
     if distr_backend.is_root_worker():
         # save final vae and cleanup

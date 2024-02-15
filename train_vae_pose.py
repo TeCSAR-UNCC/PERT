@@ -25,7 +25,7 @@ from dalle_pytorch import DiscreteVAE
 import dataset
 
 # heatmap to color
-from utils.axu import convert_to_rgb_3d
+from utils.axu import convert_to_rgb_3d, AverageMeter
 
 # argument parsing
 
@@ -166,7 +166,7 @@ deepspeed_config = {
         },
     },
     "gradient_accumulation_steps": 1,
-    "gradient_clipping": 1.0,
+    "gradient_clipping": 3.0,
     "steps_per_print": 2000,
     "train_batch_size": config.batch_size,
     "train_micro_batch_size_per_gpu": (
@@ -224,6 +224,7 @@ temp = config.starting_temp
 global_loss = float("inf")
 
 for epoch in range(config.epochs):
+    loss_per_epoch = AverageMeter()
     for i, heatmaps in enumerate(distr_dl):
 
         heatmaps = heatmaps.to(device)
@@ -248,7 +249,9 @@ for epoch in range(config.epochs):
         if not using_deepspeed_sched:
             distr_sched.step()
 
-        torch.distributed.barrier()
+        if using_deepspeed:
+            torch.distributed.barrier()
+
         if i % 100 == 0:
             if distr_backend.is_root_worker():
                 k = 4
@@ -300,6 +303,7 @@ for epoch in range(config.epochs):
 
         # Collective loss, averaged
         avg_loss = distr_backend.average_all(loss)
+        loss_per_epoch.update(avg_loss.item())
 
         if distr_backend.is_root_worker():
             if i % 10 == 0:
@@ -311,40 +315,36 @@ for epoch in range(config.epochs):
                     "epoch": epoch,
                     "iter": i,
                     "loss": avg_loss.item(),
+                    "Epcoh loss": loss_per_epoch.avg,
                     "lr": lr,
                 }
 
             wandb.log(logs)
-            file_name = "./saved_models/vae_{}_{}.pt".format(
-                config.DATASET.window_size,
-                config.DATASET.train_dataset,
-            )
-            if global_loss > avg_loss.item():
-                print("-->Saving file: {}".format(file_name))
-                save_model(file_name)
-                global_loss = avg_loss.item()
-
         global_step += 1
 
     if distr_backend.is_root_worker():
         # save trained model to wandb as an artifact every epoch's end
 
-        model_artifact = wandb.Artifact(
-            "trained-vae", type="model", metadata=dict(model_config)
-        )
-        file_name = "./saved_models/vae_{}_{}.pt".format(
-            config.DATASET.window_size,
-            config.DATASET.train_dataset,
-        )
+        if global_loss > loss_per_epoch.avg:
+            print("-->Saving file: {}".format(file_name))
+            save_model(file_name)
+            global_loss = loss_per_epoch.avg
 
-        model_artifact.add_file(file_name)
-        run.log_artifact(model_artifact)
+            model_artifact = wandb.Artifact(
+                "trained-vae", type="model", metadata=dict(model_config)
+            )
+            file_name = "./saved_models/vae_{}_{}_{}.pt".format(
+                config.DATASET.window_size, config.DATASET.train_dataset, run.name
+            )
+
+            model_artifact.add_file(file_name)
+            run.log_artifact(model_artifact)
 
 if distr_backend.is_root_worker():
     # save final vae and cleanup
 
-    save_model("./vae-final.pt")
-    wandb.save("./vae-final.pt")
+    save_model("./vae-final_{}.pt".format(run.name))
+    wandb.save("./vae-final_{}.pt".format(run.name))
 
     model_artifact = wandb.Artifact(
         "trained-vae", type="model", metadata=dict(model_config)

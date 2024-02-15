@@ -25,9 +25,9 @@ def get_model(args):
         init_values=args.layer_scale_init_value,
     )
 
-    if config.Pretrained_Models.PeIT.prefix_saved_file != "":
+    if config.Pretrained_Models.prefix_saved_file != "":
         state_dict = torch.load(
-            config.Pretrained_Models.PeIT.prefix_saved_file, map_location="cpu"
+            config.Pretrained_Models.prefix_saved_file, map_location="cpu"
         )["weights"]
         model.load_state_dict(state_dict)
 
@@ -50,14 +50,23 @@ def main():
         config.DATASET.Heatmap_Generator.heatmap_size // patch_size[1],
     )
 
-    test_dataset = eval("dataset." + config.DATASET.test_dataset)(config, is_training=False)
+    train_dataset = eval("dataset." + config.DATASET.test_dataset)(
+        config, is_training=True
+    )
 
     vf_idx = 3150
 
-    data, bool_masked_pos = test_dataset.__getitem__(vf_idx)
+    ds_data = train_dataset.__getitem__(vf_idx)
+    if len(ds_data) > 2:
+        data, scnd_data, bool_masked_pos = ds_data
+    else:
+        data, bool_masked_pos = ds_data
+        scnd_data = data
     data = np.expand_dims(data, 0)
+    scnd_data = np.expand_dims(scnd_data, 0)
     bool_masked_pos = np.expand_dims(bool_masked_pos, 0)
     data = torch.from_numpy(data).to(device, non_blocking=True)
+    scnd_data = torch.from_numpy(scnd_data).to(device, non_blocking=True)
     bool_masked_pos = torch.from_numpy(bool_masked_pos).to(device, non_blocking=True)
     bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
 
@@ -66,7 +75,7 @@ def main():
 
     temp = 0.5
 
-    recons = dVAE(data, return_loss=False, return_recons=True, temp=temp)
+    recons = dVAE(scnd_data, return_loss=False, return_recons=True, temp=temp)
 
     outputs = beit(
         data,

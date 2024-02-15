@@ -12,7 +12,7 @@ def get_args_finetune():
     config_group = parser.add_argument_group("Config")
     config_group.add_argument(
         "--cfg",
-        default="configs/PERT/PEiT_panntu.yaml",
+        default="configs/PERT/PEiT_panoptic.yaml",
         help="experiment configure file name",
         required=False,
         type=str,
@@ -118,7 +118,7 @@ def get_args():
     config_group = parser.add_argument_group("Config")
     config_group.add_argument(
         "--cfg",
-        default="configs/PERT/PEiT_panntu.yaml",
+        default="configs/PERT/PEiT_panoptic.yaml",
         help="experiment configure file name",
         required=False,
         type=str,

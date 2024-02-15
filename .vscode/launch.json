@@ -19,7 +19,7 @@
       "program": "view_frames.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/PEiT_ntu_finetune.yaml"],
+      "args": ["--cfg", "configs/PERT/PEiT_panoptic_view_frames.yaml"],
       "env": {
         "WANDB_MODE": "offline",
         "CUDA_VISIBLE_DEVICES": "2"
@@ -32,7 +32,7 @@
       "program": "view_frames_beit.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/PEiT_panntu.yaml"],
+      "args": ["--cfg", "configs/PERT/PEiT_panoptic_view_frames.yaml"],
       "env": {
         "WANDB_MODE": "offline",
         "CUDA_VISIBLE_DEVICES": "1"
@@ -61,13 +61,13 @@
       }
     },
     {
-      "name": "PERT_BEiT",
+      "name": "BEiT_Pretraining",
       "type": "debugpy",
       "request": "launch",
-      "program": "pretrain_pert.py",
+      "program": "pretrain_peit.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/PEiT_panntu_debug.yaml"],
+      "args": ["--cfg", "configs/PERT/PEiT_panoptic.yaml"],
       "env": {
         "WANDB_MODE": "offline"
       }

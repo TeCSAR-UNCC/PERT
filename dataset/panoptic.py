@@ -152,7 +152,7 @@ JOINTS_PAIRS = [
     ("l-hand", "l-thumb"),
     ("r-wrist", "r-hand"),
     ("r-hand", "r-hand-tip"),
-    ("r-hand", "r-thumb")
+    ("r-hand", "r-thumb"),
 ]
 
 
@@ -164,7 +164,7 @@ RIGHT_LIMB = (9, 10, 11, 12, 13, 14)
 
 class Panoptic(JointsDataset):
     def __init__(self, cfg, is_training, **kwargs):
-        super().__init__(cfg, **cfg.DATASET, is_training=is_training,  **kwargs)
+        super().__init__(cfg, **cfg.DATASET, is_training=is_training, **kwargs)
         self.joints_def = JOINTS_DEF
         self.hand_indices = list(HAND_JOINTS.values())
         self.joint_indices = list(JOINTS_DEF.values())
@@ -178,7 +178,7 @@ class Panoptic(JointsDataset):
         )
         # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 
-        self.sequence_list = eval(self.image_set.upper()+"_LIST")
+        self.sequence_list = eval(self.image_set.upper() + "_LIST")
         self._interval = 3
         self.cam_list = [(0, i) for i in CAMERA_LIST]
         self.num_views = len(self.cam_list)
@@ -236,7 +236,6 @@ class Panoptic(JointsDataset):
                     with open(h_file) as dfile:
                         hands = json.load(dfile)["people"]
 
-                        
                 except:
                     print(b_file, h_file)
                     continue
@@ -255,15 +254,23 @@ class Panoptic(JointsDataset):
 
                         two_hands = np.ones((len(self.hand_indices) * 2, 3))
                         if "left_hand" in hand.keys():
-                            left_hand = np.array(hand['left_hand']['landmarks']).reshape(-1, 3)
-                            two_hands[:len(self.hand_indices)] = left_hand[self.hand_indices]
+                            left_hand = np.array(
+                                hand["left_hand"]["landmarks"]
+                            ).reshape(-1, 3)
+                            two_hands[: len(self.hand_indices)] = left_hand[
+                                self.hand_indices
+                            ]
 
                         if "right_hand" in hand.keys():
-                            right_hand = np.array(hand['right_hand']['landmarks']).reshape(-1, 3)
-                            two_hands[len(self.hand_indices):] = right_hand[self.hand_indices]
-                    
+                            right_hand = np.array(
+                                hand["right_hand"]["landmarks"]
+                            ).reshape(-1, 3)
+                            two_hands[len(self.hand_indices) :] = right_hand[
+                                self.hand_indices
+                            ]
+
                         pose3d = np.array(body["joints19"]).reshape((-1, 4))
-                        
+
                         joints_vis = pose3d[:, -1] > 0.1
 
                         pose3d = np.concatenate((pose3d[:, 0:3], two_hands))
@@ -285,10 +292,12 @@ class Panoptic(JointsDataset):
                         ).transpose()[:, :2]
 
                         x_check = np.bitwise_and(
-                            pose2d[:len(joints_vis), 0] >= 0, pose2d[:len(joints_vis), 0] <= width - 1
+                            pose2d[: len(joints_vis), 0] >= 0,
+                            pose2d[: len(joints_vis), 0] <= width - 1,
                         )
                         y_check = np.bitwise_and(
-                            pose2d[:len(joints_vis), 1] >= 0, pose2d[:len(joints_vis), 1] <= height - 1
+                            pose2d[: len(joints_vis), 1] >= 0,
+                            pose2d[: len(joints_vis), 1] <= height - 1,
                         )
                         check = np.bitwise_and(x_check, y_check)
                         joints_vis[np.logical_not(check)] = 0

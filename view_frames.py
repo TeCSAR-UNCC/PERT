@@ -25,21 +25,25 @@ def main():
     args = parse_args()
     device = torch.device(config.device)
 
-    train_dataset = eval("dataset." + config.DATASET.train_dataset)(
-        config, config.DATASET.train_subset
-    )
-    test_dataset = eval("dataset." + config.DATASET.test_dataset)(
-        config, config.DATASET.test_subset
+    train_dataset = eval("dataset." + config.DATASET.test_dataset)(
+        config, is_training=True
     )
 
-    vf_idx = random.randrange(0, len(test_dataset))
+    vf_idx = 3150
 
-    data, _ = test_dataset.__getitem__(vf_idx)
-    data = np.expand_dims(data, 0)
-    data = torch.from_numpy(data).to(device)
+    ds_data = train_dataset.__getitem__(vf_idx)
+    if len(ds_data) > 2:
+        data_np, _, _ = ds_data
+    else:
+        data_np, _ = ds_data
 
     dVAE = get_dVAE(config)
     dVAE = dVAE.to(device)
+
+    vf_idx = 3150  # random.randrange(0, len(test_dataset))
+
+    data = np.expand_dims(data_np, 0)
+    data = torch.from_numpy(data).to(device)
 
     temp = 0.5
 
@@ -64,16 +68,15 @@ def main():
 
     out.release()
 
-    data = np.array(data[0].cpu().detach().numpy())
-    video_name = "ntu_sample.mp4"
-    frame_height, frame_width = data.shape[1], data.shape[2]
+    video_name = "ntu_sample_scnd.mp4"
+    frame_height, frame_width = data_np.shape[1], data_np.shape[2]
     out = cv2.VideoWriter(
         video_name, cv2.VideoWriter_fourcc(*"MP4V"), 30, (frame_width, frame_height)
     )
 
-    for i in range(data.shape[0]):
+    for i in range(data_np.shape[0]):
         # Normalize the heatmap for display
-        normalized_heatmap = cv2.normalize(data[i], None, 0, 255, cv2.NORM_MINMAX)
+        normalized_heatmap = cv2.normalize(data_np[i], None, 0, 255, cv2.NORM_MINMAX)
         colored_heatmap = cv2.applyColorMap(
             normalized_heatmap.astype("uint8"), cv2.COLORMAP_JET
         )
@@ -82,8 +85,6 @@ def main():
         out.write(colored_heatmap)
 
     out.release()
-
-    print()
 
 
 if __name__ == "__main__":

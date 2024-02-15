@@ -14,15 +14,82 @@ import pandas as pd
 from dataset.JointsDataset import JointsDataset
 from dataset.kalman_filter import KeypointsKalmanFilter
 from utils.heatmap_related import GeneratePoseTarget
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
 X_SUB_TRAIN_LIST = [
-    1, 2, 4, 5, 8, 9, 13, 14, 15, 16, 17, 18, 19, 25, 27, 28, 31, 34, 35, 38, 45, 46, 47, 49,
-    50, 52, 53, 54, 55, 56, 57, 58, 59, 70, 74, 78, 80, 81, 82, 83, 84, 85, 86, 89, 91, 92, 93, 94, 95, 97, 98, 100, 103,
+    1,
+    2,
+    4,
+    5,
+    8,
+    9,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    25,
+    27,
+    28,
+    31,
+    34,
+    35,
+    38,
+    45,
+    46,
+    47,
+    49,
+    50,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    70,
+    74,
+    78,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    89,
+    91,
+    92,
+    93,
+    94,
+    95,
+    97,
+    98,
+    100,
+    103,
 ]
 X_SETUP_TRAIN_LIST = [
-    2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32,
+    2,
+    4,
+    6,
+    8,
+    10,
+    12,
+    14,
+    16,
+    18,
+    20,
+    22,
+    24,
+    26,
+    28,
+    30,
+    32,
 ]
 
 X_SUB_VAL_LIST = [i for i in range(1, 121) if i not in X_SUB_TRAIN_LIST]
@@ -109,10 +176,10 @@ class Nturgbd(JointsDataset):
         )
         # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 
-        self.sequence_list = eval(self.image_set.upper()+"_LIST")
-        self.eval_split = "tfile.split('P')[-1][:3]" if "sub" in self.image_set else \
-                          "tfile[1:4]"
-
+        self.sequence_list = eval(self.image_set.upper() + "_LIST")
+        self.eval_split = (
+            "tfile.split('P')[-1][:3]" if "sub" in self.image_set else "tfile[1:4]"
+        )
 
         self.db_file = "group_{}.pkl".format(self.image_set)
         self.db_file = os.path.join(self.dataset_root, self.db_file)
@@ -307,7 +374,7 @@ class Nturgbd(JointsDataset):
 
 class Action_Nturgbd(Nturgbd):
     def __init__(self, cfg, is_training, **kwargs):
-        super().__init__(cfg, is_training, **kwargs)
+        super().__init__(cfg, is_training=is_training, **kwargs)
         self.vf = np.array(
             [index for index in self.vf if self.meta.loc[index[0], "id"] == 0]
         )
@@ -337,8 +404,22 @@ class Action_Nturgbd(Nturgbd):
             if self.heatmap_generator is not None:
                 data = self.heatmap_generator(np.expand_dims(data, axis=0))
 
-            pad_size = ((0, self.window_size - num_frames), (0, 0), (0, 0))
-            data = np.pad(data, pad_size, "constant")
+            diff = self.window_size - num_frames
+            if self.pad_last_frame:
+                last_frame = data[-1]
+                padding = np.repeat(last_frame[np.newaxis, :, :], diff, axis=0)
+                data = np.concatenate((data, padding), axis=0)
+            elif False:
+                if diff % 2 == 0:
+                    half = diff // 2
+                    pad_size = ((half, half), (0, 0), (0, 0))
+                else:
+                    first_half = diff // 2
+                    second_half = diff - first_half
+                    pad_size = ((first_half, second_half), (0, 0), (0, 0))
+            else:
+                pad_size = ((0, diff), (0, 0), (0, 0))
+                data = np.pad(data, pad_size, "constant")
         else:
             if self.heatmap_generator is not None:
                 data = self.heatmap_generator(np.expand_dims(data, axis=0))
@@ -347,8 +428,26 @@ class Action_Nturgbd(Nturgbd):
         unq_videos = meta[["video", "id"]].drop_duplicates()
         cls = int(unq_videos.values[0, 0][-3:]) - 1
 
+        frames = []
+        if self.second_heatmap_size:
+            data_8b = 255 * data
+            for frame in data_8b:
+                im = Image.fromarray(frame.astype(np.uint8), mode="L")
+                im = im.resize(
+                    (self.second_heatmap_size, self.second_heatmap_size),
+                    resample=Image.LANCZOS,
+                )
+                frame_guss = np.array(im, dtype=np.float32) / 255
+                frames.append(frame_guss)
+
+            second_data = np.array(frames)
+            data = [data, second_data]
+
         if self.training_mode == "fine-tuning":
-            data = [data, cls]
+            if self.second_heatmap_size:
+                data = [*data, cls]
+            else:
+                data = [data, cls]
 
         return data
 

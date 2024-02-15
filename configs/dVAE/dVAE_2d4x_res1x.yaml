@@ -1,4 +1,3 @@
-
 # Training settings
 epochs: 20
 #Not used for `triangular2` cyclic!
@@ -6,8 +5,8 @@ lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-6
 max_learning_rate: 1.0e-4
-coeff_step_size_up: 5
-coeff_step_size_down: 15
+coeff_step_size_up: 2
+coeff_step_size_down: 6
 weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
@@ -16,6 +15,7 @@ batch_size: &bts 8
 device: 'cuda'
 world_size: 2
 num_workers: *bts
+second_heatmap_size: &scnd_heatmap_size null
 
 #NOTE: Not sure what it is.
 transparent: true 
@@ -31,29 +31,31 @@ DATASET:
   root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
   window_size: &dws 300 # Dataset Window Size
   frame_interval: 1
-  stride: 80
+  stride: 300
   joint_req: 0.9
   test_subset: 'validation'
   train_subset: 'train'
   camera_num: 10
-  training_mode: 'dvae'
+  #"d_vae", "peit" or "fine-tuning"
+  training_mode: 'd_vae'
   resolution: [1920, 1080]
   drop_frames_rate: 0.3
   # Some of the NTU video have just around 1 second.
   max_num_frame_rate: 0.9
+  pad_last_frame: False
 
   # Heatmap Generator
   Heatmap_Generator:
     use_gaussian_score: false
     with_limb: true
     with_kp: false
-    heatmap_size: &hms 128 # Heatmap Size
+    heatmap_size: &hms 256 # Heatmap Size
     scaling: 1.0
 
 # Model Settings
 VAE_Params:
   image_size: *hms
-  num_layers: 3 # Number of layers (should be 3 or above)
+  num_layers: 4 # Number of layers (should be 3 or above)
   num_tokens: 8192 # Number of image tokens
   codebook_dim: 512
   hidden_dim: 256
@@ -62,6 +64,8 @@ VAE_Params:
   smooth_l1_loss: true
   kl_div_loss_weight: 0.0
   normalization: null
+  use_SiLU: False
+  
 
 Resume:
   chk_ptn: ''

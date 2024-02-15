@@ -25,6 +25,7 @@ def trunc_normal_(tensor, mean=0.0, std=1.0):
 __all__ = [
     "beit_base_patch16_224_8k_vocab",
     "beit_large_patch16_224_8k_vocab",
+    "beit_base_patch8_224_8k_vocab",
 ]
 
 
@@ -54,9 +55,9 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
         **kwargs
     ):
         super().__init__()
-        self.num_features = (
-            self.embed_dim
-        ) = embed_dim  # num_features for consistency with other models
+        self.num_features = self.embed_dim = (
+            embed_dim  # num_features for consistency with other models
+        )
 
         self.patch_embed = PatchEmbed(
             img_size=img_size,
@@ -97,9 +98,9 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
                     drop_path=dpr[i],
                     norm_layer=norm_layer,
                     init_values=init_values,
-                    window_size=self.patch_embed.patch_shape
-                    if use_rel_pos_bias
-                    else None,
+                    window_size=(
+                        self.patch_embed.patch_shape if use_rel_pos_bias else None
+                    ),
                     attn_head_dim=attn_head_dim,
                 )
                 for i in range(depth)
@@ -184,6 +185,26 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
 def beit_base_patch16_224_8k_vocab(pretrained=False, **kwargs):
     model = VisionTransformerForMaskedImageModeling(
         patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        vocab_size=8192,
+        **kwargs
+    )
+    model.default_cfg = _cfg()
+    if pretrained:
+        checkpoint = torch.load(kwargs["init_ckpt"], map_location="cpu")
+        model.load_state_dict(checkpoint["model"])
+    return model
+
+
+@register_model
+def beit_base_patch8_224_8k_vocab(pretrained=False, **kwargs):
+    model = VisionTransformerForMaskedImageModeling(
+        patch_size=8,
         embed_dim=768,
         depth=12,
         num_heads=12,
