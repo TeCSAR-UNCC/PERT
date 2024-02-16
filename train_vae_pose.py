@@ -326,15 +326,15 @@ for epoch in range(config.epochs):
         # save trained model to wandb as an artifact every epoch's end
 
         if global_loss > loss_per_epoch.avg:
+            file_name = "./saved_models/vae_{}_{}_{}.pt".format(
+                config.DATASET.window_size, config.DATASET.train_dataset, run.name
+            )
             print("-->Saving file: {}".format(file_name))
             save_model(file_name)
             global_loss = loss_per_epoch.avg
 
             model_artifact = wandb.Artifact(
                 "trained-vae", type="model", metadata=dict(model_config)
-            )
-            file_name = "./saved_models/vae_{}_{}_{}.pt".format(
-                config.DATASET.window_size, config.DATASET.train_dataset, run.name
             )
 
             model_artifact.add_file(file_name)

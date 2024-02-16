@@ -50,13 +50,13 @@ DATASET:
     use_gaussian_score: false
     with_limb: true
     with_kp: false
-    heatmap_size: &hms 256 # Heatmap Size
+    heatmap_size: &hms 128 # Heatmap Size
     scaling: 1.0
 
 # Model Settings
 VAE_Params:
   image_size: *hms
-  num_layers: 4 # Number of layers (should be 3 or above)
+  num_layers: 3 # Number of layers (should be 3 or above)
   num_tokens: 8192 # Number of image tokens
   codebook_dim: 512
   hidden_dim: 256
@@ -68,7 +68,7 @@ VAE_Params:
   use_SiLU: False
 
 Pretrained_Models:
-    discrete_vae_weight_path: './saved_models/vae_300_panoptic_vivid-capybara-3.pt'
+    discrete_vae_weight_path: './saved_models/vae_300_panoptic_cheerful-goat-7.pt'
     prefix_saved_file: ''
 
 PeIT:

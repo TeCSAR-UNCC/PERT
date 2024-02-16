@@ -73,6 +73,18 @@
       }
     },
     {
+      "name": "transformer_Pretraining",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "pretrain_pose_transformer.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/PEiT_panoptic.yaml"],
+      "env": {
+        "WANDB_MODE": "offline"
+      }
+    },
+    {
       "name": "Profiling_PERT_BEiT",
       "type": "debugpy",
       "request": "launch",
