@@ -117,12 +117,12 @@ JOINTS_DEF = {
     "l-ear": 16,
     "r-eye": 17,
     "r-ear": 18,
-    "l-hand": 19,
-    "l-hand-tip": 20,
-    "l-thumb": 21,
-    "r-hand": 22,
-    "r-hand-tip": 23,
-    "r-thumb": 24,
+    # "l-hand": 19,
+    # "l-hand-tip": 20,
+    # "l-thumb": 21,
+    # "r-hand": 22,
+    # "r-hand-tip": 23,
+    # "r-thumb": 24,
 }
 HAND_JOINTS = {
     "hand": 9,
@@ -147,12 +147,12 @@ JOINTS_PAIRS = [
     ("mid-hip", "r-hip"),
     ("r-hip", "r-knee"),
     ("r-knee", "r-ankle"),
-    ("l-wrist", "l-hand"),
-    ("l-hand", "l-hand-tip"),
-    ("l-hand", "l-thumb"),
-    ("r-wrist", "r-hand"),
-    ("r-hand", "r-hand-tip"),
-    ("r-hand", "r-thumb"),
+    # ("l-wrist", "l-hand"),
+    # ("l-hand", "l-hand-tip"),
+    # ("l-hand", "l-thumb"),
+    # ("r-wrist", "r-hand"),
+    # ("r-hand", "r-hand-tip"),
+    # ("r-hand", "r-thumb"),
 ]
 
 
@@ -175,6 +175,7 @@ class Panoptic(JointsDataset):
             left_limb=LEFT_LIMB,
             right_kp=RIGHT_LIMB,
             right_limb=RIGHT_LIMB,
+            is_training=is_training,
         )
         # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 
