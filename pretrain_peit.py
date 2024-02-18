@@ -70,6 +70,18 @@ def get_model(args):
         init_values=args.layer_scale_init_value,
     )
 
+    # Do we have a checkpoint to start from?
+    if config.Pretrained_Models.prefix_saved_file != "":
+        print(
+            "--> We are starting from here: {}".format(
+                config.Pretrained_Models.prefix_saved_file
+            )
+        )
+        state_dict = torch.load(
+            config.Pretrained_Models.prefix_saved_file, map_location="cpu"
+        )["weights"]
+        model.load_state_dict(state_dict)
+
     return model
 
 
@@ -195,7 +207,7 @@ def main(args):
             },
         },
         "gradient_accumulation_steps": 1,
-        "gradient_clipping": 3.0,
+        "gradient_clipping": 1.0,
         "steps_per_print": 2000,
         "train_batch_size": config.batch_size,
         "train_micro_batch_size_per_gpu": (

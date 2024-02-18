@@ -54,7 +54,7 @@ def main():
         config, is_training=True
     )
 
-    vf_idx = 3150
+    vf_idx = 6200
 
     ds_data = train_dataset.__getitem__(vf_idx)
     if len(ds_data) > 2:
@@ -69,6 +69,7 @@ def main():
     scnd_data = torch.from_numpy(scnd_data).to(device, non_blocking=True)
     bool_masked_pos = torch.from_numpy(bool_masked_pos).to(device, non_blocking=True)
     bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
+    torch_zero_bool_masekd = torch.zeros_like(bool_masked_pos)
 
     dVAE = get_dVAE(config)
     dVAE = dVAE.to(device)
@@ -76,10 +77,12 @@ def main():
     temp = 0.5
 
     recons = dVAE(scnd_data, return_loss=False, return_recons=True, temp=temp)
+    input_ids = dVAE.get_codebook_indices(scnd_data).flatten(1)
+    labels = input_ids[bool_masked_pos]
 
     outputs = beit(
         data,
-        bool_masked_pos=bool_masked_pos,
+        bool_masked_pos=torch_zero_bool_masekd,
         return_all_tokens=True,
     )
     recon_beit = dVAE.decode(outputs.argmax(dim=2).flatten(1))

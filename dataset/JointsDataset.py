@@ -116,7 +116,7 @@ class JointsDataset(Dataset):
         data = data[start_idx : start_idx + end_idx]
 
         if self.heatmap_generator is not None:
-            data = self.heatmap_generator(np.expand_dims(data, axis=0))
+            data, kpts = self.heatmap_generator(np.expand_dims(data, axis=0))
 
         diff = self.window_size - len(data)
         assert diff >= 0 and diff <= 300
@@ -157,7 +157,17 @@ class JointsDataset(Dataset):
 
         if self.masked_position_generator is not None:
             if self.second_heatmap_size:
-                data = [*data, self.masked_position_generator()]
+                data = [
+                    *data,
+                    self.masked_position_generator(
+                        heatmap=data, keypoints=kpts, is_training=self.is_training
+                    ),
+                ]
             else:
-                data = [data, self.masked_position_generator()]
+                data = [
+                    data,
+                    self.masked_position_generator(
+                        heatmap=data, keypoints=kpts, is_training=self.is_training
+                    ),
+                ]
         return data

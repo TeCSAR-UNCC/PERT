@@ -68,13 +68,13 @@ VAE_Params:
   use_SiLU: False
 
 Pretrained_Models:
-    discrete_vae_weight_path: './saved_models/vae_300_panoptic_vivid-capybara-3.pt'
-    prefix_saved_file: './saved_models/beit_best_beloved-romance-3.pt'
+    discrete_vae_weight_path: './saved_models/vae_300_panoptic_abundant-goat-9.pt'
+    prefix_saved_file: './saved_models/beit_best_luminous-envelope-4.pt'
 
 PeIT:
   window_size:
     - 0
     - 0
-  num_mask_patches: 20
-  max_mask_patches_per_block: 75
-  min_mask_patches_per_block: 10
+  num_mask_patches: 0.1
+  max_mask_patches_per_block: 0.2
+  min_mask_patches_per_block: 0.1

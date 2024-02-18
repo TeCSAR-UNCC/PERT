@@ -5,6 +5,7 @@ from multiprocessing.pool import Pool
 from functools import partial
 from utils.axu import scale_and_center, scale, scale_center_per_frame
 from imgaug.augmentables import Keypoint
+import random
 
 EPS = 1e-3
 
@@ -221,6 +222,7 @@ class GeneratePoseTarget:
         heatmap_size=256,
         img_dims=(1080, 1920),
         scaling=1.0,
+        is_training=False,
     ):
         self.sigma = sigma
         self.use_score = use_score
@@ -242,6 +244,7 @@ class GeneratePoseTarget:
         self.left_limb = left_limb
         self.right_limb = right_limb
         self.scaling = scaling
+        self.is_training = is_training
 
     def generate_a_heatmap(self, arr, centers, max_values):
         """Generate pseudo heatmap for one keypoint in one frame.
@@ -384,7 +387,9 @@ class GeneratePoseTarget:
                     arr[i], starts, ends, start_values, end_values
                 )
 
-    def gen_an_aug(self, results, keypoint_score=None):
+    def gen_an_aug(
+        self, results, keypoint_score=None, min_down_scaling=0.1, max_up_scaling=1
+    ):
         """Generate pseudo heatmaps for all frames.
 
         Args:
@@ -422,8 +427,15 @@ class GeneratePoseTarget:
             [Keypoint(x=x, y=y) for (x, y) in kps_per_image]
             for kps_per_image in all_kps[0]
         ]
+        if self.is_training:
+            scaling = random.uniform(min_down_scaling, max_up_scaling)
+        else:
+            scaling = 0.5
+        aug_kpt = scale_and_center(kps, scaling * self.heatmap_size)
 
-        aug_kpt = scale_and_center(kps, 0.5 * self.heatmap_size)
+        val = self.heatmap_size // 2
+        x_offset = random.randrange(-val, val)
+        y_offset = random.randrange(-val, val)
 
         for i in range(0, len(aug_kpt)):
             kp_on_image = aug_kpt[i]
@@ -433,7 +445,10 @@ class GeneratePoseTarget:
                 # assert kps.y < self.heatmap_size
                 # kps.x = min(max(kps.x, 0), self.heatmap_size - 1)
                 # kps.y = min(max(kps.y, 0), self.heatmap_size - 1)
-                all_kps[0, i, j, :] = [kps.x, kps.y]
+                if self.is_training:
+                    all_kps[0, i, j, :] = [kps.x + x_offset, kps.y + y_offset]
+                else:
+                    all_kps[0, i, j, :] = [kps.x, kps.y]
 
         num_frame = kp_shape[1]
         new_img_h, new_img_w = self.heatmap_size, self.heatmap_size  # aug_kpt[0].shape
@@ -487,10 +502,10 @@ class GeneratePoseTarget:
 
             self.generate_heatmap(ret[i], kps, kpscores)
 
-        return ret
+        return ret, all_kps[0]
 
     def __call__(self, results):
-        heatmap = self.gen_an_aug(results)
+        heatmap, kpt = self.gen_an_aug(results)
         key = "heatmap_imgs" if "imgs" in results else "imgs"
 
         if self.double:
@@ -506,7 +521,7 @@ class GeneratePoseTarget:
             heatmap_flip = heatmap[..., ::-1][:, indices]
             heatmap = np.concatenate([heatmap, heatmap_flip])
         combined_heatmaps = heatmap.max(axis=1)
-        return combined_heatmaps
+        return combined_heatmaps, kpt
 
     def __repr__(self):
         repr_str = (
