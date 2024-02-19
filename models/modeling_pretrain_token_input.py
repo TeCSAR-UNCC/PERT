@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 from functools import partial
 
-from .modeling_finetune import Block, _cfg, PatchEmbed, RelativePositionBias
+from .modeling_finetune import Block, _cfg, PatchEmbed, RelativePositionBias, TokenEmbed
 from timm.models.registry import register_model
 from timm.models.layers import trunc_normal_ as __call_trunc_normal_
 
@@ -57,7 +57,13 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
         self.num_features = self.embed_dim = (
             embed_dim  # num_features for consistency with other models
         )
-        num_patches = (img_size[1] // patch_size[1]) * (img_size[0] // patch_size[0])
+        num_patches = (img_size // patch_size) * (img_size // patch_size)
+        self.num_patches = num_patches
+        self.patch_size = (patch_size, patch_size)
+        self.embed_token = TokenEmbed(
+            vocab_size=vocab_size,
+            embed_dim=embed_dim,
+        )
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.mask_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -139,7 +145,8 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
     def get_num_layers(self):
         return len(self.blocks)
 
-    def forward_features(self, x, bool_masked_pos):
+    def forward_features(self, token, bool_masked_pos):
+        x = self.embed_token(token)
         batch_size, seq_len, _ = x.size()
 
         cls_tokens = self.cls_token.expand(

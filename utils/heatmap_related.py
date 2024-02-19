@@ -388,7 +388,7 @@ class GeneratePoseTarget:
                 )
 
     def gen_an_aug(
-        self, results, keypoint_score=None, min_down_scaling=0.1, max_up_scaling=1
+        self, results, keypoint_score=None, min_down_scaling=0.4, max_up_scaling=0.8
     ):
         """Generate pseudo heatmaps for all frames.
 
@@ -433,7 +433,7 @@ class GeneratePoseTarget:
             scaling = 0.5
         aug_kpt = scale_and_center(kps, scaling * self.heatmap_size)
 
-        val = self.heatmap_size // 2
+        val = self.heatmap_size // 4
         x_offset = random.randrange(-val, val)
         y_offset = random.randrange(-val, val)
 

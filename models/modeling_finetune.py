@@ -283,6 +283,22 @@ class PatchEmbed(nn.Module):
         return x
 
 
+class TokenEmbed(nn.Module):
+    """Image to Patch Embedding"""
+
+    def __init__(self, vocab_size=8192, embed_dim=768):
+        super().__init__()
+
+        self.proj = nn.Embedding(
+            vocab_size, embed_dim
+        )
+
+    def forward(self, token, **kwargs):
+        x = self.proj(token)
+        return x
+
+
+
 class RelativePositionBias(nn.Module):
 
     def __init__(self, window_size, num_heads):

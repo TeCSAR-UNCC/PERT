@@ -234,13 +234,13 @@ def get_transformer_args():
         metavar="MODEL",
         help="Name of model to train",
     )
-    model_group.add_argument("--rel_pos_bias", action="store_true")
+    model_group.add_argument("--rel_pos_bias", action="store_false")
     model_group.add_argument(
-        "--disable_rel_pos_bias", action="store_false", dest="rel_pos_bias"
+        "--disable_rel_pos_bias", action="store_true", dest="rel_pos_bias"
     )
-    model_group.set_defaults(rel_pos_bias=True)
+    model_group.set_defaults(rel_pos_bias=False)
     model_group.add_argument("--abs_pos_emb", action="store_true")
-    model_group.set_defaults(abs_pos_emb=False)
+    model_group.set_defaults(abs_pos_emb=True)
     model_group.add_argument(
         "--layer_scale_init_value",
         default=0.1,

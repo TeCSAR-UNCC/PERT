@@ -39,6 +39,32 @@
       }
     },
     {
+      "name": "pre_training_pose_transformer",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "pretrain_pose_transformer.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/transformer_patch8_panoptic.yaml"],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "1"
+      }
+    },
+    {
+      "name": "pose_transformer_view_frames",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "view_frames_pose_transformer.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/transformer_patch8_panoptic.yaml"],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "1"
+      }
+    },
+    {
       "name": "Heatmap generator",
       "type": "debugpy",
       "request": "launch",

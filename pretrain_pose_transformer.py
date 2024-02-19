@@ -119,7 +119,7 @@ def main(args):
     cudnn.benchmark = True
 
     model = get_model(args)
-    patch_size = model.patch_embed.patch_size
+    patch_size = model.patch_size
     print("Patch size = %s" % str(patch_size))
     config.PeIT.window_size = (
         config.DATASET.Heatmap_Generator.heatmap_size // patch_size[0],
@@ -247,7 +247,7 @@ def main(args):
         )
 
         run = wandb.init(
-            project="BEiT_window_{}_model_{}".format(
+            project="transformer_window_{}_model_{}".format(
                 config.DATASET.window_size, args.model
             ),
             job_type="training",
@@ -342,6 +342,7 @@ def main(args):
                         "epoch": epoch,
                         "iter": i,
                         "loss": avg_loss.item(),
+                        "label hist.": wandb.Histogram(labels.detach().cpu().numpy()),
                         "lr": lr,
                     }
 
