@@ -1,12 +1,12 @@
 # Training settings
-epochs: 30
+epochs: 20
 #Not used for `triangular2` cyclic!
-lr_decay: 0.99994
+lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-6
-max_learning_rate: 1.0e-4
-coeff_step_size_up: 2
-coeff_step_size_down: 1
+max_learning_rate: 1.0e-3
+coeff_step_size_up: 5
+coeff_step_size_down: 14
 weight_decay: 0.05 # Learning rate decay
 starting_temp: .6 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
@@ -19,8 +19,8 @@ num_workers: *bts
 #NOTE: Not sure what it is.
 transparent: true 
 
-deepspeed: true
-distributed_backend: true
+deepspeed: false
+distributed_backend: false
                                                              
 
 # Dataset Settings

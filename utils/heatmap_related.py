@@ -430,7 +430,7 @@ class GeneratePoseTarget:
         if self.is_training:
             scaling = random.uniform(min_down_scaling, max_up_scaling)
         else:
-            scaling = 0.5
+            scaling = 0.65
         aug_kpt = scale_and_center(kps, scaling * self.heatmap_size)
 
         val = self.heatmap_size // 4

@@ -14,3 +14,9 @@ from .modeling_finetune import (
 from .modeling_pretrain_token_input import (
     transformer_base_patch8_224_8k_vocab,
 )
+
+from .modeling_finetune_token_input import (
+    bept_base_patch16_224,
+    bept_base_patch16_384,
+    bept_base_patch8_224,
+)

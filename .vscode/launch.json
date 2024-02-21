@@ -39,6 +39,19 @@
       }
     },
     {
+      "name": "fine_tuning_pose_transformer",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "finetune_transformer.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/transformer_patch8_ntu.yaml"],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "1"
+      }
+    },
+    {
       "name": "pre_training_pose_transformer",
       "type": "debugpy",
       "request": "launch",
@@ -58,7 +71,7 @@
       "program": "view_frames_pose_transformer.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/transformer_patch8_panoptic.yaml"],
+      "args": ["--cfg", "configs/PERT/transformer_patch8_ntu.yaml"],
       "env": {
         "WANDB_MODE": "offline",
         "CUDA_VISIBLE_DEVICES": "1"

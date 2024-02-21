@@ -397,12 +397,13 @@ class Action_Nturgbd(Nturgbd):
             data = data[start_idx : start_idx + self.window_size]
 
             if self.heatmap_generator is not None:
-                data = self.heatmap_generator(np.expand_dims(data, axis=0))
+                # We don't need kpts as it's fine tuning.
+                data, _ = self.heatmap_generator(np.expand_dims(data, axis=0))
 
         elif num_frames < self.window_size:
 
             if self.heatmap_generator is not None:
-                data = self.heatmap_generator(np.expand_dims(data, axis=0))
+                data, _ = self.heatmap_generator(np.expand_dims(data, axis=0))
 
             diff = self.window_size - num_frames
             if self.pad_last_frame:
@@ -422,7 +423,7 @@ class Action_Nturgbd(Nturgbd):
                 data = np.pad(data, pad_size, "constant")
         else:
             if self.heatmap_generator is not None:
-                data = self.heatmap_generator(np.expand_dims(data, axis=0))
+                data, _ = self.heatmap_generator(np.expand_dims(data, axis=0))
 
         meta = self.meta.iloc[idx : idx + num_frames]
         unq_videos = meta[["video", "id"]].drop_duplicates()
