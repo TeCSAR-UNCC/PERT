@@ -5,13 +5,13 @@ lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-6
 max_learning_rate: 1.0e-4
-coeff_step_size_up: 2
-coeff_step_size_down: 6
+coeff_step_size_up: 5
+coeff_step_size_down: 14 
 weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
-batch_size: &bts 8
+batch_size: &bts 16
 device: 'cuda'
 world_size: 2
 num_workers: *bts
@@ -42,7 +42,7 @@ DATASET:
   drop_frames_rate: 0.3
   # Some of the NTU video have just around 1 second.
   max_num_frame_rate: 0.9
-  pad_last_frame: False
+  linear_interpolate: True
 
   # Heatmap Generator
   Heatmap_Generator:
@@ -64,7 +64,7 @@ VAE_Params:
   smooth_l1_loss: true
   kl_div_loss_weight: 0.0
   normalization: null
-  use_SiLU: False
+  use_SiLU: True
   
 
 Resume:

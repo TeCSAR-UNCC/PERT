@@ -259,7 +259,16 @@ class Block(nn.Module):
 class PatchEmbed(nn.Module):
     """Image to Patch Embedding"""
 
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
+    def __init__(
+        self,
+        img_size=224,
+        patch_size=16,
+        in_chans=3,
+        embed_dim=768,
+        hidden_dim=256,
+        single_cnn=True,
+        activation=nn.GELU,
+    ):
         super().__init__()
         img_size = to_2tuple(img_size)
         patch_size = to_2tuple(patch_size)
@@ -269,9 +278,33 @@ class PatchEmbed(nn.Module):
         self.patch_size = patch_size
         self.num_patches = num_patches
 
-        self.proj = nn.Conv2d(
-            in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
-        )
+        if single_cnn:
+            self.proj = nn.Conv2d(
+                in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
+            )
+        else:
+            print("--> Creating the Embeding Layer...")
+            from math import log2
+
+            num_layers = int(log2(img_size[0] / patch_size[0]))
+            prj_chans = [hidden_dim] * num_layers
+
+            proj_chans = [in_chans, *prj_chans]
+
+            enc_chans_io = list(zip(proj_chans[:-1], proj_chans[1:]))
+
+            proj_layers = []
+
+            for proj_in, proj_out in enc_chans_io:
+                proj_layers.append(
+                    nn.Sequential(
+                        nn.Conv2d(proj_in, proj_out, 4, stride=2, padding=1),
+                        activation(),
+                    )
+                )
+
+            proj_layers.append(nn.Conv2d(proj_chans[-1], embed_dim, 1))
+            self.proj = nn.Sequential(*proj_layers)
 
     def forward(self, x, **kwargs):
         B, C, H, W = x.shape
@@ -289,14 +322,11 @@ class TokenEmbed(nn.Module):
     def __init__(self, vocab_size=8192, embed_dim=768):
         super().__init__()
 
-        self.proj = nn.Embedding(
-            vocab_size, embed_dim
-        )
+        self.proj = nn.Embedding(vocab_size, embed_dim)
 
     def forward(self, token, **kwargs):
         x = self.proj(token)
         return x
-
 
 
 class RelativePositionBias(nn.Module):

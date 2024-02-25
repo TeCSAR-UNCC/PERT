@@ -17,6 +17,7 @@ from .masking_generator import MaskingGenerator
 from typing import List
 import random
 from PIL import Image
+from dataset.axu import expand_to_slow_motion_np
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class JointsDataset(Dataset):
         drop_frames_rate=0.3,
         max_num_frame_rate=0.9,
         is_training=True,
-        pad_last_frame=False,
+        linear_interpolate=False,
         second_heatmap_size=None,
         **kwargs,
     ):
@@ -67,7 +68,7 @@ class JointsDataset(Dataset):
         self.frame_interval = frame_interval
         self.total_window = self.window_size * self.frame_interval
         self.db = []
-        self.pad_last_frame = pad_last_frame
+        self.linear_interpolate = linear_interpolate
         self.second_heatmap_size = second_heatmap_size
         self.is_training = is_training
 
@@ -83,15 +84,15 @@ class JointsDataset(Dataset):
             self.masked_position_generator = MaskingGenerator(
                 cfg.PeIT.window_size,
                 num_masking_patches=cfg.PeIT.num_mask_patches if is_training else 0,
-                max_num_patches=cfg.PeIT.max_mask_patches_per_block,
-                min_num_patches=cfg.PeIT.min_mask_patches_per_block,
+                max_masked_number=cfg.PeIT.max_mask_patches_per_block,
+                min_masked_number=cfg.PeIT.min_mask_patches_per_block,
             )
 
     def __getitem__(self, index):
         idx, num_frames = self.vf[:: self.stride][index]
         data = self.db[idx : idx + num_frames][:: self.frame_interval]
 
-        data = np.nan_to_num(data, nan=1.0)
+        data = np.nan_to_num(data, nan=0.0)
 
         end_idx = self.window_size
         if (
@@ -106,39 +107,25 @@ class JointsDataset(Dataset):
 
         start_idx = 0
         if num_frames > self.window_size:
-            start_idx = np.random.randint(
-                0, high=num_frames - self.window_size, size=1
-            )[0]
+            start_idx = np.random.randint(0, high=num_frames - self.window_size)
         # elif num_frames < self.window_size:
         #    pad_size = ((0, self.window_size - num_frames), (0, 0), (0, 0))
         #    data = np.pad(data, pad_size, "constant")
 
         data = data[start_idx : start_idx + end_idx]
 
-        if self.heatmap_generator is not None:
-            data, kpts = self.heatmap_generator(np.expand_dims(data, axis=0))
-
         diff = self.window_size - len(data)
-        assert diff >= 0 and diff <= 300
 
-        if diff > 0:
-            if self.pad_last_frame:
-                last_frame = data[-1]
-                padding = np.repeat(last_frame[np.newaxis, :, :], diff, axis=0)
-                data = np.concatenate((data, padding), axis=0)
-            else:
-                if diff % 2 == 0:
-                    half = diff // 2
-                    pad_size = ((half, half), (0, 0), (0, 0))
-                elif False:
-                    first_half = diff // 2
-                    second_half = diff - first_half
-                    pad_size = ((first_half, second_half), (0, 0), (0, 0))
-                else:
-                    pad_size = ((0, diff), (0, 0), (0, 0))
+        if diff > 0 and self.linear_interpolate and self.heatmap_generator:
+            data = expand_to_slow_motion_np(data, self.window_size)
 
-                data = np.pad(data, pad_size, "constant")
-                # print("{}_{}".format(len(data), diff))
+        if self.heatmap_generator is not None:
+            data, kpts = self.heatmap_generator(data)
+
+        if not self.linear_interpolate:
+            diff = self.window_size - num_frames
+            pad_size = ((0, diff), (0, 0), (0, 0))
+            data = np.pad(data, pad_size, "constant")
 
         frames = []
         if self.second_heatmap_size:

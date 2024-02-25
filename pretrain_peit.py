@@ -19,6 +19,7 @@ from pathlib import Path
 import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CyclicLR
+from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
 
 # dalle classes and utils
 
@@ -68,6 +69,7 @@ def get_model(args):
         use_shared_rel_pos_bias=args.rel_pos_bias,
         use_abs_pos_emb=args.abs_pos_emb,
         init_values=args.layer_scale_init_value,
+        single_cnn=not (args.disable_single_cnn),
     )
 
     # Do we have a checkpoint to start from?
@@ -202,12 +204,21 @@ def main(args):
         "optimizer": {
             "type": "AdamW",
             "params": {
-                "lr": config.base_learning_rate,
+                "lr": config.max_learning_rate,
                 "weight_decay": config.weight_decay,
             },
         },
+        "scheduler": {
+            "type": "WarmupCosineLR",
+            "params": {
+                "total_num_steps": config.epochs * len(dl),
+                "warmup_min_ratio": 0,
+                "warmup_num_steps": step_size_up,
+                "cos_min_ratio": config.base_learning_rate,
+            },
+        },
         "gradient_accumulation_steps": 1,
-        "gradient_clipping": 1.0,
+        "gradient_clipping": 3.0,
         "steps_per_print": 2000,
         "train_batch_size": config.batch_size,
         "train_micro_batch_size_per_gpu": (
@@ -222,7 +233,7 @@ def main(args):
         optimizer=opt if not using_deepspeed else None,
         model_parameters=model.parameters(),
         training_data=ds if using_deepspeed else dl,
-        lr_scheduler=sched,  # if not using_deepspeed else None,
+        lr_scheduler=sched if not using_deepspeed else None,
         config_params=deepspeed_config,
     )
 
@@ -305,11 +316,6 @@ def main(args):
 
             loss_value = loss.item()
 
-            if not math.isfinite(loss_value):
-                print("Loss is {}, stopping training".format(loss_value))
-                if distr_backend.is_root_worker():
-                    wandb.finish()
-
             if using_deepspeed:
                 # Gradients are automatically zeroed after the step
                 dist_model.backward(loss)
@@ -355,6 +361,7 @@ def main(args):
                         "epoch": epoch,
                         "iter": i,
                         "loss": avg_loss.item(),
+                        "label hist.": wandb.Histogram(labels.detach().cpu().numpy()),
                         "lr": lr,
                     }
 

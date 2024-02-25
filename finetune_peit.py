@@ -1,16 +1,11 @@
-import argparse
-import datetime
 import numpy as np
 import time
 import torch
 import torch.backends.cudnn as cudnn
-import json
 import torch.nn as nn
 
 from pathlib import Path
 
-import math
-from math import sqrt
 import argparse
 from pathlib import Path
 
@@ -19,6 +14,7 @@ from pathlib import Path
 import torch
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.optim import Adam
+from torch.utils.data.distributed import DistributedSampler
 
 # dalle classes and utils
 
@@ -27,6 +23,8 @@ from dalle_pytorch import distributed_utils
 
 # vision imports
 from torch.utils.data import DataLoader
+
+from datetime import datetime
 
 
 # For DS
@@ -37,14 +35,13 @@ from configs.config import config
 from configs.config import update_config
 
 # Heatmap
-from utils.heatmap_related import GeneratePoseTarget
 from utils import init_distributed_mode, get_rank
 from utils.args_handler import get_args_finetune
 
 from timm.models import create_model
 from timm.utils import accuracy
 
-# Note: Just to enforce to update timm.models dictionary
+# Note: For updating timm.models dictionary
 import models
 
 from utils.axu import fill_the_model, AverageMeter, reduce_mean
@@ -70,64 +67,60 @@ def get_model(args):
 
 def save_model(
     path,
-    hparam,
     using_deepspeed,
     distr_model,
     distr_backend,
     model,
+    epoch,
+    top1_val=0,
 ):
-    save_obj = {
-        "hparams": hparam,
-    }
-    print("Saved at {}".format(path))
+    save_obj = {"epoch": epoch, "top1_val": top1_val}
 
-    if using_deepspeed and False:
-        cp_path = Path(path)
-        path_sans_extension = cp_path.parent / cp_path.stem
-        cp_dir = str(path_sans_extension) + "-ds-cp"
+    if using_deepspeed:
 
-        distr_model.save_checkpoint(cp_dir, client_state=save_obj)
+        distr_model.save_checkpoint(path, client_state=save_obj)
+        return
         # We do not return so we do get a "normal" checkpoint to refer to.
 
     if not distr_backend.is_root_worker():
         return
 
+    # Fixme: Add optimizer and scheduler states here.
     save_obj = {**save_obj, "weights": model.state_dict()}
 
     torch.save(save_obj, path)
 
 
-def validate(model_engin, dl_validation, device):
+def validate(model_engin, dl_validation, device, using_deepspeed, nprocs):
     model_engin.eval()  # Set the model to evaluation mode
-    top1_correct = 0
-    top5_correct = 0
-    total = 0
-
+    # print("---> Hello from validation.")
     with torch.no_grad():  # Disable gradient calculation
-        for i, (data, _, target) in enumerate(dl_validation):
+        top1 = AverageMeter()
+        top5 = AverageMeter()
+
+        for _, batch in enumerate(dl_validation):
+            # for _ in range(1):
+            #    batch = next(iter(dl_validation))
+            if len(batch) > 2:
+                (data, _, target) = batch
+            else:
+                data, target = batch
             data, target = data.to(device), target.to(device)
             with torch.cuda.amp.autocast():
                 outputs = model_engin(data)
-            _, pred = outputs.topk(5, 1, True, True)
-            pred = pred.t()
-            correct = pred.eq(target.view(1, -1).expand_as(pred))
 
-            top1_correct += correct[:1].reshape(-1).float().sum(0, keepdim=True)
-            top5_correct += correct[:5].reshape(-1).float().sum(0, keepdim=True)
-            total += target.size(0)
-            print(
-                "{:3.2f} of validation is passed.".format(
-                    (i * 100) / len(dl_validation)
-                ),
-                end="\r",
-            )
+            acc = accuracy(outputs, target, topk=(1, 5))
+            if using_deepspeed:
+                reduced_acc1 = reduce_mean(acc[0], nprocs)
+                reduced_acc5 = reduce_mean(acc[1], nprocs)
+            else:
+                reduced_acc1 = acc[0]
+                reduced_acc5 = acc[1]
 
-    top1_accuracy = top1_correct / total * 100
-    top5_accuracy = top5_correct / total * 100
+            top1.update(reduced_acc1, data.size(0))
+            top5.update(reduced_acc5, data.size(0))
 
-    print()
-
-    return top1_accuracy.item(), top5_accuracy.item()
+    return top1.avg, top5.avg
 
 
 def main(args):
@@ -191,12 +184,25 @@ def main(args):
         persistent_workers=(config.num_workers > 0),
     )
 
+    nprocs = distr_backend.get_world_size()
+    print("===> The word size is {}".format(nprocs))
+
+    val_sampler = None
+    if using_deepspeed:
+        val_sampler = DistributedSampler(
+            ds_eval,
+            num_replicas=nprocs,
+            rank=args.local_rank,
+            shuffle=False,
+            drop_last=False,
+        )
+
     dl_val = DataLoader(
         ds_eval,
         config.batch_size,
         shuffle=False,
-        sampler=None,
-        num_workers=config.num_workers,
+        sampler=val_sampler,
+        num_workers=(config.num_workers // 2),
         pin_memory=True,
         persistent_workers=(config.num_workers > 0),
         drop_last=False,
@@ -209,7 +215,6 @@ def main(args):
     )
 
     step_size_up = int(config.coeff_step_size_up * len(dl_train))
-    step_size_down = int(config.coeff_step_size_down * len(dl_train))
 
     sched = OneCycleLR(
         optimizer=opt,
@@ -228,22 +233,29 @@ def main(args):
         "optimizer": {
             "type": "AdamW",
             "params": {
-                "lr": config.base_learning_rate,
+                "lr": config.max_learning_rate,
                 "weight_decay": config.weight_decay,
             },
         },
         "scheduler": {
-            "type": "OneCycle",
+            "type": "WarmupCosineLR",
             "params": {
-                "cycle_first_step_size": step_size_up,
-                "cycle_second_step_size": step_size_down,
-                "cycle_min_lr": config.base_learning_rate,
-                "cycle_max_lr": config.max_learning_rate,
-                "decay_lr_rate": config.lr_decay,
+                "total_num_steps": config.epochs * len(dl_train),
+                "warmup_min_ratio": 0,
+                "warmup_num_steps": step_size_up,
+                "cos_min_ratio": config.base_learning_rate,
             },
         },
+        "zero_optimization": {
+            "stage": 2,
+            "contiguous_gradients": True,
+            "overlap_comm": True,
+            "reduce_scatter": True,
+            "reduce_bucket_size": 5e8,
+            "allgather_bucket_size": 5e8,
+        },
         "gradient_accumulation_steps": 1,
-        "gradient_clipping": 3.0,
+        "gradient_clipping": 0,
         "steps_per_print": 2000,
         "train_batch_size": config.batch_size,
         "train_micro_batch_size_per_gpu": (
@@ -252,14 +264,13 @@ def main(args):
         "wall_clock_breakdown": False,
     }
 
-    nprocs = distr_backend.get_world_size()
-    print("===> The word size is {}".format(nprocs))
+    parameters = [p for p in model.parameters() if p.requires_grad]
 
     (dist_model, distr_opt, distr_dl, distr_sched) = distr_backend.distribute(
         args=config,
         model=model,
         optimizer=opt if not using_deepspeed else None,
-        model_parameters=model.parameters(),
+        model_parameters=parameters,
         training_data=ds_train if using_deepspeed else dl_train,
         lr_scheduler=sched if not using_deepspeed else None,
         config_params=deepspeed_config,
@@ -280,6 +291,30 @@ def main(args):
         )
     )
 
+    chk_top1_val = 0
+    chk_epoch = 0
+
+    if config.PeIT.finetune_checkpoint != "":
+        _, states = dist_model.load_checkpoint(
+            config.PeIT.finetune_checkpoint,
+        )
+        chk_epoch, chk_top1_val = states["epoch"], states["top1_val"]
+        print(
+            "---> Model loaded from: {}.\n\tLast epoch: {}.\n\tTop1 Validation: {:3.2f}".format(
+                config.PeIT.finetune_checkpoint, chk_epoch, chk_top1_val
+            )
+        )
+    # Let's create the sub folder for saving the checkpoints
+    base_directory = Path(config.PeIT.checkpoint_root_folder)
+    full_path = base_directory / config.PeIT.custom_run_name
+    if not full_path.exists():
+        # Let's error if the folder exist!
+        full_path.mkdir(parents=True, exist_ok=True)
+    elif any(full_path.iterdir()):
+        raise FileExistsError(
+            "XXX> The folder has already been created and it's not empty."
+        )
+
     if distr_backend.is_root_worker():
         # weights & biases experiment tracking
 
@@ -295,6 +330,7 @@ def main(args):
             use_shared_rel_pos_bias=args.rel_pos_bias,
             use_abs_pos_emb=args.abs_pos_emb,
             init_values=args.layer_scale_init_value,
+            saved_dir=full_path,
         )
 
         run = wandb.init(
@@ -303,14 +339,17 @@ def main(args):
             config=model_config,
         )
 
-    global_step = 0
-    val_top1 = 0.0
+    start_epoch = max(0, chk_epoch)
+    val_top1 = max(0.0, chk_top1_val)
     val_top5 = 0.0
+    global_step = 0
 
-    for epoch in range(config.epochs):
+    for epoch in range(start_epoch, config.epochs):
         top1 = AverageMeter()
         top5 = AverageMeter()
         for i, batch in enumerate(distr_dl):
+            # for i in range(4):
+            #    batch = next(iter(distr_dl))
             model.train()
 
             if len(batch) == 2:
@@ -322,17 +361,8 @@ def main(args):
             labels = labels.to(device, non_blocking=True)
 
             with torch.cuda.amp.autocast():
-                outputs = model(
-                    heatmaps,
-                )
+                outputs = model(heatmaps)
                 loss = nn.CrossEntropyLoss()(input=outputs, target=labels)
-
-            loss_value = loss.item()
-
-            if not math.isfinite(loss_value):
-                print("Loss is {}, stopping training".format(loss_value))
-                if distr_backend.is_root_worker():
-                    wandb.finish()
 
             if using_deepspeed:
                 # Gradients are automatically zeroed after the step
@@ -353,23 +383,16 @@ def main(args):
             # Collective loss, averaged
             avg_loss = distr_backend.average_all(loss)
 
-            torch.distributed.barrier()
-
             acc = accuracy(outputs, labels, topk=(1, 5))
-            reduced_acc1 = reduce_mean(acc[0], nprocs)
-            reduced_acc5 = reduce_mean(acc[1], nprocs)
+            if using_deepspeed:
+                reduced_acc1 = reduce_mean(acc[0], nprocs)
+                reduced_acc5 = reduce_mean(acc[1], nprocs)
+            else:
+                reduced_acc1 = acc[0]
+                reduced_acc5 = acc[1]
 
             top1.update(reduced_acc1, heatmaps.size(0))
             top5.update(reduced_acc5, heatmaps.size(0))
-
-            if distr_backend.is_root_worker():
-                if i > 0 and i % 1000 == 0:
-                    start = time.time()
-                    acc_val = validate(model, dl_val, device)
-                    end = time.time()
-                    print("Validation took: {}".format(end - start))
-                else:
-                    acc_val = [val_top1, val_top5]
 
             if distr_backend.is_root_worker():
                 if i % 100 == 0:
@@ -384,12 +407,8 @@ def main(args):
                         **logs,
                         "Top-1 (Training)": top1.avg,
                         "Top-5 (Training)": top5.avg,
-                        "Max Top-1 (Validation)": (
-                            acc_val[0] if acc_val[0] > val_top1 else val_top1
-                        ),
-                        "Max Top-5 (Validation)": (
-                            acc_val[1] if acc_val[1] > val_top5 else val_top5
-                        ),
+                        "Max Top-1 (Validation)": val_top1,
+                        "Max Top-5 (Validation)": val_top5,
                         "epoch": epoch,
                         "iter": i,
                         "loss": avg_loss.item(),
@@ -397,55 +416,45 @@ def main(args):
                     }
 
                 wandb.log(logs)
+
             global_step += 1
 
-            if distr_backend.is_root_worker() and val_top1 < acc_val[0]:
-                # save trained model to wandb as an artifact every epoch's end
+        # End of one epoch
+        print("-> Starting validation...")
+        start = time.time()
+        acc_val = validate(
+            model,
+            dl_val,
+            device,
+            using_deepspeed=using_deepspeed,
+            nprocs=nprocs,
+        )
+        end = time.time()
+        print("Validation took: {}".format(end - start))
 
-                print("-> Saving model for acc: {:.2f} ".format(top1.avg))
-                save_model(
-                    "./saved_models/beit_best_{}_finetuning.pt".format(run.name),
-                    model_config,
-                    using_deepspeed,
-                    dist_model,
-                    distr_backend,
-                    model,
+        if val_top1 < acc_val[0]:
+            # save trained model to wandb as an artifact every epoch's end
+
+            print("-> Saving model for acc: {:.2f} ".format(top1.avg))
+            if not using_deepspeed:
+                chk_path = str(
+                    full_path / "beit_best_{}_finetuning.pt".format(run.name)
                 )
-                # model_artifact = wandb.Artifact(
-                #    "trained-model", type="model", metadata=model_config
-                # )
-                # model_artifact.add_file(
-                #    "./saved_models/beit_best_{}_finetuning.pt".format(run.name)
-                # ),
-                # run.log_artifact(model_artifact)
-
-                val_top1 = acc_val[0]
-                val_top5 = acc_val[1]
+            else:
+                chk_path = str(full_path)
+            save_model(
+                chk_path,
+                using_deepspeed,
+                dist_model,
+                distr_backend,
+                model,
+                epoch=epoch + 1,
+                top1_val=acc_val[0],
+            )
+            val_top1 = acc_val[0]
+            val_top5 = acc_val[1]
 
     if distr_backend.is_root_worker():
-        # save final vae and cleanup
-
-        save_model(
-            "./saved_models/beit_final_{}_finetuning.pt".format(run.name),
-            model_config,
-            using_deepspeed,
-            dist_model,
-            distr_backend,
-            model,
-        )
-        wandb.save(
-            "./saved_models/beit_final_{}_finetuning.pt".format(run.name),
-        )
-
-        if epoch % 5 == 0:
-            model_artifact = wandb.Artifact(
-                "trained-finetuining", type="model", metadata=dict(args.model)
-            )
-            model_artifact.add_file(
-                "./saved_models/beit_final_{}_finetuning.pt".format(run.name),
-            )
-            run.log_artifact(model_artifact)
-
         wandb.finish()
 
 

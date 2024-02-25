@@ -60,6 +60,7 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
         num_patches = (img_size // patch_size) * (img_size // patch_size)
         self.num_patches = num_patches
         self.patch_size = (patch_size, patch_size)
+
         self.embed_token = TokenEmbed(
             vocab_size=vocab_size,
             embed_dim=embed_dim,

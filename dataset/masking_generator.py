@@ -207,8 +207,8 @@ class MaskingGenerator:
         self,
         input_size,
         num_masking_patches,
-        min_num_patches=4,
-        max_num_patches=None,
+        min_masked_number=4,
+        max_masked_number=None,
         min_aspect=0.3,
         max_aspect=None,
     ):
@@ -220,15 +220,15 @@ class MaskingGenerator:
 
         if num_masking_patches < 1:
             num_masking_patches = round(num_masking_patches * self.num_patches)
-        if max_num_patches is not None and max_num_patches < 1:
-            max_masked_number = round(max_num_patches * self.num_patches)
-        if min_num_patches < 1:
-            min_masked_number = round(min_num_patches * self.num_patches)
+        if max_masked_number is not None and max_masked_number < 1:
+            max_masked_number = round(max_masked_number * self.num_patches)
+        if min_masked_number < 1:
+            min_masked_number = round(min_masked_number * self.num_patches)
 
         self.num_masking_patches = num_masking_patches
         self.min_num_patches = min_masked_number
         self.max_num_patches = (
-            num_masking_patches if max_num_patches is None else max_masked_number
+            num_masking_patches if max_masked_number is None else max_masked_number
         )
 
         max_aspect = max_aspect or 1 / min_aspect
@@ -277,7 +277,7 @@ class MaskingGenerator:
         self,
         heatmap=None,
         keypoints: NDArray | None = None,
-        normal_blocking_chance=0.4,
+        normal_blocking_chance=0.7,
         is_training=True,
     ):
         if not is_training:

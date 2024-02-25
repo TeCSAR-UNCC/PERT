@@ -541,6 +541,7 @@ class VisionTransformer(nn.Module):
             normalization=normalization,
             num_resnet_blocks=num_resnet_blocks,
         )
+
         num_patches = (img_size // patch_size) * (img_size // patch_size)
         self.num_patches = num_patches
         self.patch_size = (patch_size, patch_size)

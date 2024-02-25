@@ -23,13 +23,8 @@ def get_model(args):
         use_shared_rel_pos_bias=args.rel_pos_bias,
         use_abs_pos_emb=args.abs_pos_emb,
         init_values=args.layer_scale_init_value,
+        single_cnn=not (args.disable_single_cnn),
     )
-
-    if config.Pretrained_Models.prefix_saved_file != "":
-        state_dict = torch.load(
-            config.Pretrained_Models.prefix_saved_file, map_location="cpu"
-        )["weights"]
-        model.load_state_dict(state_dict)
 
     return model
 

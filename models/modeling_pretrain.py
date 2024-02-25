@@ -52,6 +52,7 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
         use_rel_pos_bias=False,
         use_shared_rel_pos_bias=False,
         init_std=0.02,
+        single_cnn=True,
         **kwargs
     ):
         super().__init__()
@@ -64,6 +65,7 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
             patch_size=patch_size,
             in_chans=in_chans,
             embed_dim=embed_dim,
+            single_cnn=single_cnn,
         )
         num_patches = self.patch_embed.num_patches
 

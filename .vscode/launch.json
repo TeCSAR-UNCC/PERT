@@ -32,7 +32,7 @@
       "program": "view_frames_beit.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/PEiT_panoptic_view_frames.yaml"],
+      "args": ["--cfg", "configs/PERT/PEiT_ntu_finetune.yaml"],
       "env": {
         "WANDB_MODE": "offline",
         "CUDA_VISIBLE_DEVICES": "1"
@@ -46,6 +46,19 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": ["--cfg", "configs/PERT/transformer_patch8_ntu.yaml"],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "1"
+      }
+    },
+    {
+      "name": "original_finetuning",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "finetune_peit.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "./configs/PERT/PEiT_ntu_finetune.yaml"],
       "env": {
         "WANDB_MODE": "offline",
         "CUDA_VISIBLE_DEVICES": "1"
@@ -71,7 +84,7 @@
       "program": "view_frames_pose_transformer.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/transformer_patch8_ntu.yaml"],
+      "args": ["--cfg", "configs/PERT/transformer_patch8_panoptic.yaml"],
       "env": {
         "WANDB_MODE": "offline",
         "CUDA_VISIBLE_DEVICES": "1"

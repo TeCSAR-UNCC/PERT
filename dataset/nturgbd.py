@@ -15,6 +15,8 @@ from dataset.JointsDataset import JointsDataset
 from dataset.kalman_filter import KeypointsKalmanFilter
 from utils.heatmap_related import GeneratePoseTarget
 from PIL import Image
+from dataset.axu import expand_to_slow_motion_np
+from utils.heatmap_related import CV2BasedLimbGenerated
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +168,7 @@ class Nturgbd(JointsDataset):
 
         self.joints_def = JOINTS_DEF
         self.joint_indices = list(JOINTS_DEF.values())
+        """
         self.heatmap_generator = GeneratePoseTarget(
             **cfg.DATASET.Heatmap_Generator,
             skeletons=SKELETON,
@@ -173,6 +176,18 @@ class Nturgbd(JointsDataset):
             left_limb=LEFT_LIMB,
             right_kp=RIGHT_LIMB,
             right_limb=RIGHT_LIMB,
+        )
+        """
+        self.heatmap_generator = CV2BasedLimbGenerated(
+            self.resolution,
+            (
+                cfg.DATASET.Heatmap_Generator.heatmap_size,
+                cfg.DATASET.Heatmap_Generator.heatmap_size,
+            ),
+            limb_pairs=SKELETON,
+            min_down_scaling=0.5,
+            max_up_scaling=0.8,
+            is_training=is_training,
         )
         # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 
@@ -384,7 +399,7 @@ class Action_Nturgbd(Nturgbd):
         idx, num_frames = self.vf[:: self.stride][index]
         data = self.db[idx : idx + num_frames][:: self.frame_interval]
 
-        data = np.nan_to_num(data, nan=1.0)
+        data = np.nan_to_num(data, nan=0.0)
 
         # data = self._filter_data(data)
 
@@ -398,32 +413,20 @@ class Action_Nturgbd(Nturgbd):
 
             if self.heatmap_generator is not None:
                 # We don't need kpts as it's fine tuning.
-                data, _ = self.heatmap_generator(np.expand_dims(data, axis=0))
+                data, _ = self.heatmap_generator(data)
 
-        elif num_frames < self.window_size:
+        else:
+
+            if self.linear_interpolate and self.heatmap_generator:
+                data = expand_to_slow_motion_np(data, self.window_size)
 
             if self.heatmap_generator is not None:
-                data, _ = self.heatmap_generator(np.expand_dims(data, axis=0))
+                data, _ = self.heatmap_generator(data)
 
-            diff = self.window_size - num_frames
-            if self.pad_last_frame:
-                last_frame = data[-1]
-                padding = np.repeat(last_frame[np.newaxis, :, :], diff, axis=0)
-                data = np.concatenate((data, padding), axis=0)
-            elif False:
-                if diff % 2 == 0:
-                    half = diff // 2
-                    pad_size = ((half, half), (0, 0), (0, 0))
-                else:
-                    first_half = diff // 2
-                    second_half = diff - first_half
-                    pad_size = ((first_half, second_half), (0, 0), (0, 0))
-            else:
+            if not self.linear_interpolate:
+                diff = self.window_size - num_frames
                 pad_size = ((0, diff), (0, 0), (0, 0))
                 data = np.pad(data, pad_size, "constant")
-        else:
-            if self.heatmap_generator is not None:
-                data, _ = self.heatmap_generator(np.expand_dims(data, axis=0))
 
         meta = self.meta.iloc[idx : idx + num_frames]
         unq_videos = meta[["video", "id"]].drop_duplicates()

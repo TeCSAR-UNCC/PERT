@@ -2,14 +2,14 @@
 # Training settings
 epochs: 30
 #Not used for `triangular2` cyclic!
-lr_decay: 0.99994
-anneal_rate: 0.000001 # Temperature annealing rate
-base_learning_rate: 5.0e-7
-max_learning_rate: 1.0e-4
+lr_decay: 0.999994
+anneal_rate: 1.0e-7 # Temperature annealing rate
+base_learning_rate: 5.0e-8
+max_learning_rate: 1.0e-3
 coeff_step_size_up: 1
-coeff_step_size_down: 2
+coeff_step_size_down: 5
 weight_decay: 0.05 # Learning rate decay
-starting_temp: 1.0 # Starting temperature
+starting_temp: 5.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
 batch_size: 8
@@ -41,7 +41,7 @@ DATASET:
   drop_frames_rate: 0.3
   # Some of the NTU video have just around 1 second.
   max_num_frame_rate: 0.9
-  pad_last_frame: False
+  linear_interpolate: True
   second_heatmap_size: &dVAE_heatmap_size null
 
 
@@ -50,7 +50,7 @@ DATASET:
     use_gaussian_score: false
     with_limb: true
     with_kp: false
-    heatmap_size: &hms 128 # Heatmap Size
+    heatmap_size: &hms 256 # Heatmap Size
     scaling: 1.0
 
 
@@ -62,7 +62,7 @@ ImageEmbed:
   hidden_dim: 256
   num_resnet_blocks: 4 # Number of residual net blocks
   normalization: null
-  use_SiLU: False
+  use_SiLU: True
   temperature: 0.9
   straight_through: false
 

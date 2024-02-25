@@ -1,21 +1,21 @@
 
 # Training settings
-epochs: 20
+epochs: 100
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
-base_learning_rate: 1.0e-6
-max_learning_rate: 1.0e-4
+base_learning_rate: 1.0e-8
+max_learning_rate: 1.0e-3
 coeff_step_size_up: 5
 coeff_step_size_down: 10
 weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
-batch_size: 8
+batch_size: 16
 device: 'cuda'
 world_size: 2
-num_workers: 8
+num_workers: 16
 
 #NOTE: Not sure what it is.
 transparent: true 
@@ -41,8 +41,8 @@ DATASET:
   drop_frames_rate: 0.3
   # Some of the NTU video have just around 1 second.
   max_num_frame_rate: 0.9
-  pad_last_frame: False
-  second_heatmap_size: &dVAE_heatmap_size 128
+  linear_interpolate: True
+  second_heatmap_size: &dVAE_heatmap_size null
 
 
   # Heatmap Generator
@@ -56,8 +56,8 @@ DATASET:
 
 # Model Settings
 VAE_Params:
-  image_size: *dVAE_heatmap_size
-  num_layers: 3 # Number of layers (should be 3 or above)
+  image_size: *hms
+  num_layers: 4 # Number of layers (should be 3 or above)
   num_tokens: 8192 # Number of image tokens
   codebook_dim: 512
   hidden_dim: 256
@@ -66,15 +66,17 @@ VAE_Params:
   smooth_l1_loss: true
   kl_div_loss_weight: 0.0
   normalization: null
-  use_SiLU: false
+  use_SiLU: True
 
 Pretrained_Models:
-  discrete_vae_weight_path: './saved_models/vae.pt'
-  pretrain_saved_file: ''
+  discrete_vae_weight_path: ''
+  pretrain_saved_file: './saved_models/beit_best_prime-lake-19.pt'
 
 
 PeIT:
-  finetune_saved_file: ''
+  finetune_checkpoint: ''
+  checkpoint_root_folder: './saved_models/'
+  custom_run_name: 'NTU_RUN4'
   window_size:
     - 0
     - 0

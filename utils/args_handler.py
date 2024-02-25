@@ -138,6 +138,9 @@ def get_args_finetune():
         "--disable_rel_pos_bias", action="store_false", dest="rel_pos_bias"
     )
     model_group.set_defaults(rel_pos_bias=True)
+    model_group.add_argument("--disable_single_cnn", action="store_true")
+    model_group.set_defaults(disable_single_cnn=False)
+
     model_group.add_argument("--abs_pos_emb", action="store_true")
     model_group.set_defaults(abs_pos_emb=False)
     model_group.add_argument(
@@ -244,6 +247,8 @@ def get_args():
         "--disable_rel_pos_bias", action="store_false", dest="rel_pos_bias"
     )
     model_group.set_defaults(rel_pos_bias=True)
+    model_group.add_argument("--disable_single_cnn", action="store_true")
+    model_group.set_defaults(disable_single_cnn=False)
     model_group.add_argument("--abs_pos_emb", action="store_true")
     model_group.set_defaults(abs_pos_emb=False)
     model_group.add_argument(

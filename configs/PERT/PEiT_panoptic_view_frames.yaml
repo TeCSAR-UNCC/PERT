@@ -50,7 +50,7 @@ DATASET:
     use_gaussian_score: false
     with_limb: true
     with_kp: false
-    heatmap_size: &hms 128 # Heatmap Size
+    heatmap_size: &hms 256 # Heatmap Size
     scaling: 1.0
 
 # Model Settings
@@ -75,6 +75,6 @@ PeIT:
   window_size:
     - 0
     - 0
-  num_mask_patches: 0.1
-  max_mask_patches_per_block: 0.2
-  min_mask_patches_per_block: 0.1
+  num_mask_patches: 0.4
+  max_mask_patches_per_block: 0.4
+  min_mask_patches_per_block: 0.2

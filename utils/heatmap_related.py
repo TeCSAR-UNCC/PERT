@@ -6,8 +6,100 @@ from functools import partial
 from utils.axu import scale_and_center, scale, scale_center_per_frame
 from imgaug.augmentables import Keypoint
 import random
+import cv2
 
 EPS = 1e-3
+
+
+class CV2BasedLimbGenerated:
+    def __init__(
+        self,
+        original_shape,
+        heatmap_shape,
+        limb_pairs,
+        min_down_scaling,
+        max_up_scaling,
+        is_training=False,
+    ) -> None:
+        self.original_shape = original_shape
+        self.heatmap_shape = heatmap_shape
+        self.limb_pairs = limb_pairs
+        self.min_down_scaling = min_down_scaling
+        self.max_up_scaling = max_up_scaling
+        self.is_training = is_training
+
+    def __call__(self, keypoints):
+        """
+        Generate limb heatmaps from keypoints, scaling keypoints from their original resolution to the output heatmap resolution.
+
+        :param keypoints: Array of shape (F, K, 2) containing keypoint coordinates for each frame.
+        :param original_shape: Tuple (H_prime, W_prime) defining the size of the original coordinate space.
+        :param output_shape: Tuple (H, W) defining the size of the output heatmap.
+        :param limb_pairs: List of tuples defining pairs of keypoints that form limbs.
+        :return: Array of shape (F, H, W) containing limb heatmaps for each frame.
+        """
+
+        kps = [
+            [Keypoint(x=x, y=y) for (x, y) in kps_per_image]
+            for kps_per_image in keypoints
+        ]
+        if self.is_training:
+            scaling = random.uniform(self.min_down_scaling, self.max_up_scaling)
+        else:
+            scaling = 0.65
+        aug_kpt = scale_and_center(kps, scaling * self.heatmap_shape[0])
+
+        val_x = self.heatmap_shape[0] // 4
+        val_y = self.heatmap_shape[0] // 4
+        x_offset = random.randrange(-val_x, val_x)
+        y_offset = random.randrange(-val_y, val_y)
+
+        keypoints_scales = np.zeros_like(keypoints)
+        for i in range(0, len(aug_kpt)):
+            kp_on_image = aug_kpt[i]
+            for j in range(0, len(kp_on_image)):
+                kps = kp_on_image[j]
+                if self.is_training:
+                    keypoints_scales[i, j, :] = [kps.x + x_offset, kps.y + y_offset]
+                else:
+                    keypoints_scales[i, j, :] = [kps.x, kps.y]
+
+        F, K, _ = keypoints_scales.shape
+        H, W = self.heatmap_shape
+        heatmaps = np.zeros((F, H, W), dtype=np.float32)
+
+        for f in range(F):
+            frame_heatmap = np.zeros((H, W), dtype=np.float32)
+            for start_idx, end_idx in self.limb_pairs:
+                # Scale keypoints from original resolution to heatmap resolution
+                start_point = tuple(
+                    np.round(keypoints_scales[f, start_idx]).astype(np.int32)
+                )
+                end_point = tuple(
+                    np.round(keypoints_scales[f, end_idx]).astype(np.int32)
+                )
+
+                # Draw line for the limb
+                cv2.line(frame_heatmap, start_point, end_point, color=1, thickness=2)
+
+            # Optionally apply Gaussian blur to smooth the heatmap
+            frame_heatmap = cv2.GaussianBlur(
+                frame_heatmap, (0, 0), sigmaX=1.25, sigmaY=1.25
+            )
+
+            # Normalize the heatmap to [0, 1]
+            frame_heatmap = cv2.normalize(
+                frame_heatmap,
+                None,
+                alpha=0,
+                beta=1,
+                norm_type=cv2.NORM_MINMAX,
+                dtype=cv2.CV_32F,
+            )
+
+            heatmaps[f] = frame_heatmap
+
+        return heatmaps, keypoints_scales
 
 
 def flatten_generate_a_heatmap(sigma, arr, centers, max_values):

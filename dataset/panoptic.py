@@ -25,7 +25,7 @@ import pandas as pd
 from dataset.JointsDataset import JointsDataset
 from utils.transforms import projectPoints
 from dataset.kalman_filter import KeypointsKalmanFilter
-from utils.heatmap_related import GeneratePoseTarget
+from utils.heatmap_related import CV2BasedLimbGenerated
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +168,7 @@ class Panoptic(JointsDataset):
         self.joints_def = JOINTS_DEF
         self.hand_indices = list(HAND_JOINTS.values())
         self.joint_indices = list(JOINTS_DEF.values())
+        """
         self.heatmap_generator = GeneratePoseTarget(
             **cfg.DATASET.Heatmap_Generator,
             skeletons=SKELETON,
@@ -177,6 +178,19 @@ class Panoptic(JointsDataset):
             right_limb=RIGHT_LIMB,
             is_training=is_training,
         )
+        """
+        self.heatmap_generator = CV2BasedLimbGenerated(
+            self.resolution,
+            (
+                cfg.DATASET.Heatmap_Generator.heatmap_size,
+                cfg.DATASET.Heatmap_Generator.heatmap_size,
+            ),
+            limb_pairs=SKELETON,
+            min_down_scaling=0.5,
+            max_up_scaling=0.8,
+            is_training=is_training,
+        )
+
         # self.kf_filter = KeypointsKalmanFilter(n_keypoints=len(self.joint_indices) - 1)
 
         self.sequence_list = eval(self.image_set.upper() + "_LIST")
