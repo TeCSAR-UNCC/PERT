@@ -201,8 +201,17 @@ def main(args):
         "optimizer": {
             "type": "AdamW",
             "params": {
-                "lr": config.base_learning_rate,
+                "lr": config.max_learning_rate,
                 "weight_decay": config.weight_decay,
+            },
+        },
+        "scheduler": {
+            "type": "WarmupCosineLR",
+            "params": {
+                "total_num_steps": config.epochs * len(dl),
+                "warmup_min_ratio": 0,
+                "warmup_num_steps": step_size_up,
+                "cos_min_ratio": config.base_learning_rate,
             },
         },
         "gradient_accumulation_steps": 1,

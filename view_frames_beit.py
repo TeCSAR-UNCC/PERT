@@ -9,6 +9,7 @@ from utils.get_dVAE import get_dVAE
 from utils.args_handler import get_args
 from timm.models import create_model
 import models
+import random
 
 
 def get_model(args):
@@ -35,23 +36,82 @@ def main():
 
     device = torch.device(config.device)
 
-    beit = get_model(args)
-    beit = beit.to(device)
+    ds = eval("dataset." + config.DATASET.test_dataset)(config, is_training=False)
 
-    patch_size = beit.patch_embed.patch_size
+    if config.DATASET.test_dataset != "action_nturgbd":
+        beit = get_model(args)
+        beit = beit.to(device)
 
-    config.PeIT.window_size = (
-        config.DATASET.Heatmap_Generator.heatmap_size // patch_size[0],
-        config.DATASET.Heatmap_Generator.heatmap_size // patch_size[1],
-    )
+        patch_size = beit.patch_size
 
-    train_dataset = eval("dataset." + config.DATASET.test_dataset)(
-        config, is_training=True
-    )
+        config.PeIT.window_size = (
+            config.DATASET.Heatmap_Generator.heatmap_size // patch_size[0],
+            config.DATASET.Heatmap_Generator.heatmap_size // patch_size[1],
+        )
+
+    vf_idx = random.randint(0, len(ds))
+
+    ds_data = ds.__getitem__(vf_idx)
+
+    if config.DATASET.test_dataset == "action_nturgbd":
+        print("==> Just dVAE for NTU...")
+
+        if len(ds_data) > 2:
+            data, scnd_data, cls = ds_data
+        else:
+            data, cls = ds_data
+            scnd_data = data
+
+        data = np.expand_dims(data, 0)
+        scnd_data = np.expand_dims(scnd_data, 0)
+        scnd_data = torch.from_numpy(scnd_data).to(device, non_blocking=True)
+
+        dVAE = get_dVAE(config)
+        dVAE = dVAE.to(device)
+        temp = 0.5
+        recons = dVAE(scnd_data, return_loss=False, return_recons=True, temp=temp)
+        recons = recons[0].cpu().detach().numpy()
+        video_name = "ntu_recons_{}.mp4".format(vf_idx)
+        frame_height, frame_width = recons.shape[1], recons.shape[2]
+        out = cv2.VideoWriter(
+            video_name, cv2.VideoWriter_fourcc(*"MP4V"), 30, (frame_width, frame_height)
+        )
+
+        for i in range(recons.shape[0]):
+            # Normalize the heatmap for display
+            normalized_heatmap = cv2.normalize(recons[i], None, 0, 255, cv2.NORM_MINMAX)
+            colored_heatmap = cv2.applyColorMap(
+                normalized_heatmap.astype("uint8"), cv2.COLORMAP_JET
+            )
+
+            # Write to video
+            out.write(colored_heatmap)
+
+        out.release()
+
+        data = np.array(data[0])
+        video_name = "ntu_sample_{}.mp4".format(vf_idx)
+        frame_height, frame_width = data.shape[1], data.shape[2]
+        out = cv2.VideoWriter(
+            video_name, cv2.VideoWriter_fourcc(*"MP4V"), 30, (frame_width, frame_height)
+        )
+
+        for i in range(data.shape[0]):
+            # Normalize the heatmap for display
+            normalized_heatmap = cv2.normalize(data[i], None, 0, 255, cv2.NORM_MINMAX)
+            colored_heatmap = cv2.applyColorMap(
+                normalized_heatmap.astype("uint8"), cv2.COLORMAP_JET
+            )
+
+            # Write to video
+            out.write(colored_heatmap)
+
+        out.release()
+        exit(0)
 
     vf_idx = 6200
 
-    ds_data = train_dataset.__getitem__(vf_idx)
+    ds_data = ds.__getitem__(vf_idx)
     if len(ds_data) > 2:
         data, scnd_data, bool_masked_pos = ds_data
     else:

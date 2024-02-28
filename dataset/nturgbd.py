@@ -185,7 +185,7 @@ class Nturgbd(JointsDataset):
                 cfg.DATASET.Heatmap_Generator.heatmap_size,
             ),
             limb_pairs=SKELETON,
-            min_down_scaling=0.5,
+            min_down_scaling=0.65,
             max_up_scaling=0.8,
             is_training=is_training,
         )

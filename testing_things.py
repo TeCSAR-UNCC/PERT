@@ -6,7 +6,14 @@ from configs.config import update_config
 import dataset
 import numpy as np
 from utils import view_skeleton_batch
+from utils.axu import heatmap_visualization
 from utils.heatmap_related import GeneratePoseTarget
+from pyskl.datasets.builder import build_from_cfg, build_dataset
+from mmcv import Config
+from operator import itemgetter
+import configs.nturgbd.ntu120_limb_xsub
+import random
+from utils.get_dVAE import get_dVAE
 
 
 def parse_args():
@@ -19,6 +26,38 @@ def parse_args():
     update_config(args.cfg)
 
     return args
+
+
+def load_ntu_pkl():
+    args = parse_args()
+    device = torch.device(config.device)
+
+    cfg_file = "./configs/nturgbd/ntu120_limb_xsub.py"
+    cfg = Config.fromfile(cfg_file)
+
+    ds = build_dataset(cfg.data.val)
+    size = len(ds)
+    idx = random.randint(0, size)
+    imgs, _ = itemgetter("imgs", "label")(ds.__getitem__(idx))
+    imgs = imgs.squeeze(0)
+    imgs = imgs.permute((1, 0, 2, 3))
+    imgs, _ = imgs.max(axis=1)
+    heatmap_visualization(imgs.numpy())
+
+    dVAE = get_dVAE(config)
+    dVAE = dVAE.to(device)
+
+    data = np.expand_dims(imgs, 0)
+    data = torch.from_numpy(data).to(device)
+
+    temp = 0.8146
+
+    _, recons = dVAE(data, return_loss=True, return_recons=True, temp=temp)
+
+    recons = np.array(recons[0].cpu().detach().numpy())
+    heatmap_visualization(recons, "ntu_recon_mmcv.mp4")
+
+    print()
 
 
 def main():
@@ -61,4 +100,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    load_ntu_pkl()

@@ -9,6 +9,26 @@ from imgaug.augmentables import Keypoint, KeypointsOnImage
 from collections import OrderedDict
 
 
+def heatmap_visualization(heatmap, video_name="heatmap_video.mp4"):
+
+    frame_height, frame_width = heatmap.shape[1], heatmap.shape[2]
+    out = cv2.VideoWriter(
+        video_name, cv2.VideoWriter_fourcc(*"MP4V"), 30, (frame_width, frame_height)
+    )
+
+    for i in range(heatmap.shape[0]):
+        # Normalize the heatmap for display
+        normalized_heatmap = cv2.normalize(heatmap[i], None, 0, 255, cv2.NORM_MINMAX)
+        colored_heatmap = cv2.applyColorMap(
+            normalized_heatmap.astype("uint8"), cv2.COLORMAP_JET
+        )
+
+        # Write to video
+        out.write(colored_heatmap)
+
+    out.release()
+
+
 def scale_center_per_frame(keypoints_frames: list[Keypoint], N: int):
     scaled_and_centered_frames = []
 
@@ -88,6 +108,46 @@ def scale(keypoints_frames: list[Keypoint], N: int) -> list[Keypoint]:
     return scaled_frames
 
 
+def resize_keypoints(keypoints, original_size=(1920, 1080), target_size=(256, 256)):
+    """
+    Resizes keypoints from an original resolution to a target resolution
+    while maintaining the aspect ratio.
+
+    Parameters:
+    - keypoints: np.array of shape (N, F, J, 2) containing keypoints for N batches,
+      F frames, J keypoints, and 2 for (x, y) coordinates.
+    - original_size: Tuple specifying the original resolution (width, height).
+    - target_size: Tuple specifying the target resolution (width, height).
+
+    Returns:
+    - resized_keypoints: np.array of the resized keypoints maintaining the aspect ratio.
+    """
+    original_width, original_height = original_size
+    target_width, target_height = target_size
+
+    # Calculate the scaling factors for width and height separately
+    scale_width = target_width / original_width
+    scale_height = target_height / original_height
+
+    # Choose the smaller scale factor to maintain aspect ratio
+    scale = min(scale_width, scale_height)
+
+    # Resize keypoints
+    resized_keypoints = keypoints * scale
+
+    # If you need to center the keypoints in the new resolution, calculate the offset
+    new_width = original_width * scale
+    new_height = original_height * scale
+    offset_x = (target_width - new_width) / 2 if new_width < target_width else 0
+    offset_y = (target_height - new_height) / 2 if new_height < target_height else 0
+
+    # Apply offset to center the keypoints
+    resized_keypoints[..., 0] += offset_x
+    resized_keypoints[..., 1] += offset_y
+
+    return resized_keypoints
+
+
 def scale_and_center(kps: list[Keypoint], N: int) -> list[Keypoint]:
     # Calculate global bounding box
     for frame_kps in kps:
@@ -105,17 +165,31 @@ def scale_and_center(kps: list[Keypoint], N: int) -> list[Keypoint]:
     offset_x = (N - scaled_width) / 2 - (min_x * scale_factor)
     offset_y = (N - scaled_height) / 2 - (min_y * scale_factor)
     # Create an augmenter for scaling
-    augmenter = iaa.Sequential(
-        [
-            iaa.Affine(scale=scale_factor),  # Scale keypoints
-            iaa.Affine(
-                translate_px={
-                    "x": round(offset_x),
-                    "y": round(offset_y),
-                }
-            ),  # Center keypoints
-        ]
-    )
+    try:
+        augmenter = iaa.Sequential(
+            [
+                iaa.Affine(scale=scale_factor),  # Scale keypoints
+                iaa.Affine(
+                    translate_px={
+                        "x": round(offset_x),
+                        "y": round(offset_y),
+                    }
+                ),  # Center keypoints
+            ]
+        )
+    except:
+        # For the case when KP is not big enough
+        augmenter = iaa.Sequential(
+            [
+                iaa.Affine(scale=1.0),  # Scale keypoints
+                iaa.Affine(
+                    translate_px={
+                        "x": round(offset_x),
+                        "y": round(offset_y),
+                    }
+                ),  # Center keypoints
+            ]
+        )
 
     # Apply the augmentation to all frames
     aug_kpt = []

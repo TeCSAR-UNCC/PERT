@@ -340,7 +340,7 @@ def get_transformer_args():
 
     model_group.add_argument(
         "--model",
-        default="transformer_base_patch8_224_8k_vocab",
+        default="transformer_base_patch16_224_8k_vocab",
         type=str,
         metavar="MODEL",
         help="Name of model to train",

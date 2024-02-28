@@ -3,7 +3,7 @@ import numpy as np
 import imgaug as ia
 from multiprocessing.pool import Pool
 from functools import partial
-from utils.axu import scale_and_center, scale, scale_center_per_frame
+from utils.axu import scale_and_center, scale, scale_center_per_frame, resize_keypoints
 from imgaug.augmentables import Keypoint
 import random
 import cv2
@@ -28,7 +28,7 @@ class CV2BasedLimbGenerated:
         self.max_up_scaling = max_up_scaling
         self.is_training = is_training
 
-    def __call__(self, keypoints):
+    def __call__(self, keypoints, resolution=None):
         """
         Generate limb heatmaps from keypoints, scaling keypoints from their original resolution to the output heatmap resolution.
 
@@ -47,6 +47,7 @@ class CV2BasedLimbGenerated:
             scaling = random.uniform(self.min_down_scaling, self.max_up_scaling)
         else:
             scaling = 0.65
+        aug_kpt = resize_keypoints(keypoints, resolution)
         aug_kpt = scale_and_center(kps, scaling * self.heatmap_shape[0])
 
         val_x = self.heatmap_shape[0] // 4
@@ -285,7 +286,7 @@ class GeneratePoseTarget:
         sigma=1.0,
         use_score=False,
         use_gaussian_score=False,
-        mean_gaussian_score=0.65,
+        mean_gaussian_score=0.85,
         scale_gaussian_score=0.16,
         with_kp=True,
         with_limb=False,
@@ -318,9 +319,9 @@ class GeneratePoseTarget:
     ):
         self.sigma = sigma
         self.use_score = use_score
-        self.use_gaussian_score = (use_gaussian_score,)
-        self.mean_gaussian_score = (mean_gaussian_score,)
-        self.scale_gaussian_score = (scale_gaussian_score,)
+        self.use_gaussian_score = use_gaussian_score
+        self.mean_gaussian_score = mean_gaussian_score
+        self.scale_gaussian_score = scale_gaussian_score
         self.with_kp = with_kp
         self.with_limb = with_limb
         self.double = double
@@ -480,7 +481,7 @@ class GeneratePoseTarget:
                 )
 
     def gen_an_aug(
-        self, results, keypoint_score=None, min_down_scaling=0.4, max_up_scaling=0.8
+        self, results, keypoint_score=None, min_down_scaling=0.65, max_up_scaling=1.0
     ):
         """Generate pseudo heatmaps for all frames.
 
@@ -525,7 +526,7 @@ class GeneratePoseTarget:
             scaling = 0.65
         aug_kpt = scale_and_center(kps, scaling * self.heatmap_size)
 
-        val = self.heatmap_size // 4
+        val = self.heatmap_size // 8
         x_offset = random.randrange(-val, val)
         y_offset = random.randrange(-val, val)
 

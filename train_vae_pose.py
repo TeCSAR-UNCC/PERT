@@ -151,22 +151,21 @@ deepspeed_config = {
     "optimizer": {
         "type": "AdamW",
         "params": {
-            "lr": config.base_learning_rate,
+            "lr": config.max_learning_rate,
             "weight_decay": config.weight_decay,
         },
     },
     "scheduler": {
-        "type": "OneCycle",
+        "type": "WarmupCosineLR",
         "params": {
-            "cycle_first_step_size": step_size_up,
-            "cycle_second_step_size": step_size_down,
-            "cycle_min_lr": config.base_learning_rate,
-            "cycle_max_lr": config.max_learning_rate,
-            "decay_lr_rate": config.lr_decay,
+            "total_num_steps": config.epochs * len(dl_train),
+            "warmup_min_ratio": 0,
+            "warmup_num_steps": step_size_up,
+            "cos_min_ratio": config.base_learning_rate,
         },
     },
     "gradient_accumulation_steps": 1,
-    "gradient_clipping": 3.0,
+    "gradient_clipping": 0,
     "steps_per_print": 2000,
     "train_batch_size": config.batch_size,
     "train_micro_batch_size_per_gpu": (

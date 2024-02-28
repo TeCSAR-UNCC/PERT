@@ -17,7 +17,7 @@ from .masking_generator import MaskingGenerator
 from typing import List
 import random
 from PIL import Image
-from dataset.axu import expand_to_slow_motion_np
+from dataset.axu import uniform_sample_frames
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +34,12 @@ class JointsDataset(Dataset):
         frame_interval=1,
         training_mode="",
         resolution=[1920, 1080],
-        drop_frames_rate=0.3,
+        drop_frames_rate=0.1,
         max_num_frame_rate=0.9,
         is_training=True,
         linear_interpolate=False,
         second_heatmap_size=None,
+        num_clips=300,
         **kwargs,
     ):
         this_dir = os.path.dirname(__file__)
@@ -71,6 +72,7 @@ class JointsDataset(Dataset):
         self.linear_interpolate = linear_interpolate
         self.second_heatmap_size = second_heatmap_size
         self.is_training = is_training
+        self.num_clip = num_clips
 
         self.training_mode = None
         if training_mode.lower() in ["d_vae", "peit", "fine-tuning"]:
@@ -94,38 +96,19 @@ class JointsDataset(Dataset):
 
         data = np.nan_to_num(data, nan=0.0)
 
-        end_idx = self.window_size
-        if (
-            random.random() <= self.drop_frames_rate
-            and self.is_training
-            and (self.training_mode == "d_vae" or self.training_mode == "peit")
-        ):
-            # Let's drop some frame
-            cur_rate = random.uniform(0, self.max_num_frame_rate)
-
-            end_idx = round((1 - cur_rate) * self.window_size)
-
         start_idx = 0
-        if num_frames > self.window_size:
+        if num_frames > self.num_clip:
             start_idx = np.random.randint(0, high=num_frames - self.window_size)
         # elif num_frames < self.window_size:
         #    pad_size = ((0, self.window_size - num_frames), (0, 0), (0, 0))
         #    data = np.pad(data, pad_size, "constant")
 
-        data = data[start_idx : start_idx + end_idx]
+        data = data[start_idx : start_idx + self.num_clip]
 
-        diff = self.window_size - len(data)
-
-        if diff > 0 and self.linear_interpolate and self.heatmap_generator:
-            data = expand_to_slow_motion_np(data, self.window_size)
+        data = uniform_sample_frames(data, self.window_size)
 
         if self.heatmap_generator is not None:
-            data, kpts = self.heatmap_generator(data)
-
-        if not self.linear_interpolate:
-            diff = self.window_size - num_frames
-            pad_size = ((0, diff), (0, 0), (0, 0))
-            data = np.pad(data, pad_size, "constant")
+            data, kpts = self.heatmap_generator(np.expand_dims(data, axis=0))
 
         frames = []
         if self.second_heatmap_size:

@@ -5,7 +5,7 @@ lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-8
 max_learning_rate: 1.0e-3
-coeff_step_size_up: 5
+coeff_step_size_up: 1
 coeff_step_size_down: 17
 weight_decay: 0.05 # Learning rate decay
 starting_temp: .6 # Starting temperature
@@ -28,9 +28,9 @@ DATASET:
   train_dataset: 'panoptic'
   test_dataset: 'panoptic'
   root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-  window_size: &dws 300 # Dataset Window Size
+  window_size: &dws 48 # Dataset Window Size
   frame_interval: 1
-  stride: 300
+  stride: 150
   joint_req: 0.9
   test_subset: 'validation'
   train_subset: 'train'
@@ -38,7 +38,7 @@ DATASET:
   #"d_vae", "peit" or "fine-tuning"
   training_mode: 'peit'
   resolution: [1920, 1080]
-  drop_frames_rate: 0.3
+  drop_frames_rate: 0.1
   # Some of the NTU video have just around 1 second.
   max_num_frame_rate: 0.9
   linear_interpolate: True
@@ -67,8 +67,8 @@ VAE_Params:
   use_SiLU: True
 
 Pretrained_Models:
-    discrete_vae_weight_path: './saved_models/vae_300_panoptic_legendary-moon-11.pt'
-    prefix_saved_file: './saved_models/beit_best_abundant-pig-18.pt'
+    discrete_vae_weight_path: './saved_models/vae_48_panoptic_woven-flower-3.pt'
+    prefix_saved_file: ''
 
 PeIT:
   window_size:
