@@ -32,13 +32,17 @@ def load_ntu_pkl():
     args = parse_args()
     device = torch.device(config.device)
 
-    cfg_file = "./configs/nturgbd/ntu120_limb_xsub.py"
-    cfg = Config.fromfile(cfg_file)
+    # cfg_file = "./configs/nturgbd/ntu120_limb_xsub.py"
+    # cfg = Config.fromfile(cfg_file)
 
-    ds = build_dataset(cfg.data.val)
+    # ds = build_dataset(cfg.data.val)
+    from dataset import ntu_mmcv
+
+    ds = ntu_mmcv(config, False)
     size = len(ds)
+
     idx = random.randint(0, size)
-    imgs, _ = itemgetter("imgs", "label")(ds.__getitem__(idx))
+    imgs, _ = ds.__getitem__(idx)
     imgs = imgs.squeeze(0)
     imgs = imgs.permute((1, 0, 2, 3))
     imgs, _ = imgs.max(axis=1)

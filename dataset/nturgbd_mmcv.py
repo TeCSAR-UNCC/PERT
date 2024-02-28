@@ -8,6 +8,7 @@ from torch.utils.data import Dataset
 from mmcv import Config
 from pyskl.datasets import build_dataset
 from operator import itemgetter
+from torch import Tensor
 
 
 class NTU_MMCV(Dataset):
@@ -15,6 +16,7 @@ class NTU_MMCV(Dataset):
         super().__init__(**kwargs)
         cfg = Config.fromfile(cfg.DATASET.mmcv_config)
 
+        self.is_training = is_training
         if is_training:
             self.ds = build_dataset(cfg.data.train)
         else:
@@ -28,4 +30,7 @@ class NTU_MMCV(Dataset):
         imgs = imgs.squeeze(0)
         imgs = imgs.permute((1, 0, 2, 3))
         imgs, _ = imgs.max(axis=1)
-        return [imgs, label[0]]
+        if self.is_training:
+            return [imgs, label[0]]
+        else:
+            return [imgs, label]
