@@ -1,12 +1,12 @@
 
 # Training settings
-epochs: 100
+epochs: 15
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-8
-max_learning_rate: 1.0e-3
-coeff_step_size_up: 5
+max_learning_rate: 1.0e-4
+coeff_step_size_up: 1
 coeff_step_size_down: 10
 weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
@@ -39,13 +39,13 @@ DATASET:
 
 Pretrained_Models:
   discrete_vae_weight_path: ''
-  pretrain_saved_file: ''
+  pretrain_saved_file: './saved_models/beit_best_leafy-yogurt-1.pt'
 
 
 PeIT:
   finetune_checkpoint: ''
   checkpoint_root_folder: './saved_models/'
-  custom_run_name: 'NTU_RUN4_Supervised_Learning'
+  custom_run_name: 'NTU_RUN6_PreTrained_Learning_Leafy_Yogurt_15Epoch'
   window_size:
     - 0
     - 0

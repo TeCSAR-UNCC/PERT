@@ -97,7 +97,7 @@ data = dict(
     test_dataloader=dict(videos_per_gpu=1),
     train=dict(
         type="RepeatDataset",
-        times=1,
+        times=10,
         dataset=dict(
             type=dataset_type,
             ann_file=ann_file,

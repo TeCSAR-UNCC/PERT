@@ -9,11 +9,26 @@ from utils import view_skeleton_batch
 from utils.axu import heatmap_visualization
 from utils.heatmap_related import GeneratePoseTarget
 from pyskl.datasets.builder import build_from_cfg, build_dataset
+from pyskl.models.builder import build_model
 from mmcv import Config
 from operator import itemgetter
 import configs.nturgbd.ntu120_limb_xsub
 import random
 from utils.get_dVAE import get_dVAE
+
+
+import torch
+from vector_quantize_pytorch import VectorQuantize
+
+vq = VectorQuantize(
+    dim=512,
+    codebook_size=8192,
+    codebook_dim=512,  # paper proposes setting this to 32 or as low as 8 to increase codebook usage
+    accept_image_fmap=True,
+)
+
+x = torch.randn(1, 8192, 16, 16)
+quantized, indices, commit_loss = vq(x)
 
 
 def parse_args():
@@ -32,13 +47,14 @@ def load_ntu_pkl():
     args = parse_args()
     device = torch.device(config.device)
 
-    # cfg_file = "./configs/nturgbd/ntu120_limb_xsub.py"
-    # cfg = Config.fromfile(cfg_file)
+    cfg_file = "./configs/nturgbd/ntu120_limb_xsub.py"
+    cfg = Config.fromfile(cfg_file)
 
-    # ds = build_dataset(cfg.data.val)
-    from dataset import ntu_mmcv
+    ds = build_dataset(cfg.data.val)
+    model = build_model(cfg.model)
+    # from dataset import ntu_mmcv
 
-    ds = ntu_mmcv(config, False)
+    # ds = ntu_mmcv(config, False)
     size = len(ds)
 
     idx = random.randint(0, size)

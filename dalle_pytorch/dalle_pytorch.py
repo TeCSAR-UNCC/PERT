@@ -138,7 +138,6 @@ class DiscreteVAE(nn.Module):
         temperature=0.9,
         straight_through=False,
         reinmax=False,
-        kl_div_loss_weight=0.0,
         normalization=((*((0.5,) * 3), 0), (*((0.5,) * 3), 1)),
         use_SiLU=True,
     ):
@@ -201,7 +200,6 @@ class DiscreteVAE(nn.Module):
         self.decoder = nn.Sequential(*dec_layers)
 
         self.loss_fn = F.smooth_l1_loss if smooth_l1_loss else F.mse_loss
-        self.kl_div_loss_weight = kl_div_loss_weight
 
         # take care of normalization within class
         """
@@ -258,12 +256,12 @@ class DiscreteVAE(nn.Module):
         return_recons=False,
         return_logits=False,
         temp=None,
+        kl_div_loss_weight=0,
     ):
-        device, num_tokens, image_size, kl_div_loss_weight = (
+        device, num_tokens, image_size = (
             img.device,
             self.num_tokens,
             self.image_size,
-            self.kl_div_loss_weight,
         )
         assert (
             img.shape[-1] == image_size and img.shape[-2] == image_size
@@ -312,7 +310,7 @@ class DiscreteVAE(nn.Module):
         if not return_recons:
             return loss
 
-        return loss, out
+        return loss, out, recon_loss
 
 
 # main classes

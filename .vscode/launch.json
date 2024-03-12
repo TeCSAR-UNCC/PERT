@@ -113,6 +113,19 @@
       }
     },
     {
+      "name": "dqVAE",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "train_vqvae_pose.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/dVAE/qvVAE.yaml"],
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "1",
+        "WANDB_MODE": "offline"
+      }
+    },
+    {
       "name": "BEiT_Pretraining",
       "type": "debugpy",
       "request": "launch",

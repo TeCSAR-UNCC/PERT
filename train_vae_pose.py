@@ -126,7 +126,7 @@ if distr_backend.is_root_worker():
         num_tokens=config.VAE_Params.num_tokens,
         smooth_l1_loss=config.VAE_Params.smooth_l1_loss,
         num_resnet_blocks=config.VAE_Params.num_resnet_blocks,
-        kl_loss_weight=config.VAE_Params.kl_div_loss_weight,
+        kl_loss_weight="Dynamic",
     )
 
     run = wandb.init(
@@ -158,14 +158,14 @@ deepspeed_config = {
     "scheduler": {
         "type": "WarmupCosineLR",
         "params": {
-            "total_num_steps": config.epochs * len(dl_train),
+            "total_num_steps": step_size_down,
             "warmup_min_ratio": 0,
             "warmup_num_steps": step_size_up,
             "cos_min_ratio": config.base_learning_rate,
         },
     },
     "gradient_accumulation_steps": 1,
-    "gradient_clipping": 0,
+    "gradient_clipping": config.gradient_clipping,
     "steps_per_print": 2000,
     "train_batch_size": config.batch_size,
     "train_micro_batch_size_per_gpu": (
@@ -220,6 +220,7 @@ def save_model(path):
 
 global_step = 0
 temp = config.starting_temp
+kl_weight_loss = config.starting_kl_weight
 global_loss = float("inf")
 
 for epoch in range(config.epochs):
@@ -228,8 +229,12 @@ for epoch in range(config.epochs):
 
         heatmaps = heatmaps.to(device)
         with torch.cuda.amp.autocast():
-            loss, recons = distr_vae(
-                heatmaps, return_loss=True, return_recons=True, temp=temp
+            loss, recons, recon_loss = distr_vae(
+                heatmaps,
+                return_loss=True,
+                return_recons=True,
+                temp=temp,
+                kl_div_loss_weight=kl_weight_loss,
             )
 
         if using_deepspeed:
@@ -250,6 +255,25 @@ for epoch in range(config.epochs):
 
         if using_deepspeed:
             torch.distributed.barrier()
+
+        if using_deepspeed:
+            total_norm = distr_vae.get_global_grad_norm()
+        else:
+            parameters = [
+                p
+                for p in distr_vae.parameters()
+                if p.grad is not None and p.requires_grad
+            ]
+            if len(parameters) == 0:
+                total_norm = 0.0
+            else:
+                device = parameters[0].grad.device
+                total_norm = torch.norm(
+                    torch.stack(
+                        [torch.norm(p.grad.detach()).to(device) for p in parameters]
+                    ),
+                    2.0,
+                ).item()
 
         if i % 100 == 0:
             if distr_backend.is_root_worker():
@@ -300,13 +324,27 @@ for epoch in range(config.epochs):
                 temp * math.exp(-config.anneal_rate * global_step), config.temp_min
             )
 
+            kl_weight_loss = kl_weight_loss * (
+                math.exp(-config.kl_div_loss_weight_anneal_rate * global_step)
+            )
+            kl_weight_loss = (
+                kl_weight_loss
+                if kl_weight_loss > config.zero_kl_div_loss_weight_at
+                else 0
+            )
+
         # Collective loss, averaged
         avg_loss = distr_backend.average_all(loss)
-        loss_per_epoch.update(avg_loss.item())
+        avg_recons_loss = distr_backend.average_all(recon_loss)
+        loss_per_epoch.update(avg_recons_loss.item())
 
         if distr_backend.is_root_worker():
             if i % 10 == 0:
-                lr = distr_sched.get_last_lr()[0]
+                try:
+                    lr = distr_sched.get_last_lr()[0]
+                except:
+                    lr = float("nan")
+
                 print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
 
                 logs = {
@@ -315,6 +353,8 @@ for epoch in range(config.epochs):
                     "iter": i,
                     "loss": avg_loss.item(),
                     "Epcoh loss": loss_per_epoch.avg,
+                    "KL Div. Weight": kl_weight_loss,
+                    "Grad. Norm": total_norm,
                     "lr": lr,
                 }
 
