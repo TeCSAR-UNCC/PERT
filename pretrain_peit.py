@@ -88,32 +88,30 @@ def get_model(args):
 
 
 def save_model(
-    path,
-    hparam,
+    full_path,
     using_deepspeed,
     distr_model,
     distr_backend,
     model,
+    epoch,
+    acc_top1=0,
+    run_name="",
 ):
-    save_obj = {
-        "hparams": hparam,
-    }
-    print("Saved at {}".format(path))
+    save_obj = {"epoch": epoch, "top1_val": acc_top1}
 
-    if using_deepspeed and False:
-        cp_path = Path(path)
-        path_sans_extension = cp_path.parent / cp_path.stem
-        cp_dir = str(path_sans_extension) + "-ds-cp"
-
-        distr_model.save_checkpoint(cp_dir, client_state=save_obj)
-        # We do not return so we do get a "normal" checkpoint to refer to.
+    if using_deepspeed:
+        chk_path = str(full_path)
+        distr_model.save_checkpoint(chk_path, client_state=save_obj)
 
     if not distr_backend.is_root_worker():
         return
 
+    # Fixme: Add optimizer and scheduler states here.
     save_obj = {**save_obj, "weights": model.state_dict()}
 
-    torch.save(save_obj, path)
+    file_name = full_path / "beit_best_{}_finetuning.pt".format(run_name)
+
+    torch.save(save_obj, str(file_name))
 
 
 def main(args):
@@ -122,6 +120,7 @@ def main(args):
     print(args)
 
     args.config = config
+    args.model = config.PeIT.model
 
     device = torch.device(config.device)
 
@@ -217,8 +216,16 @@ def main(args):
                 "cos_min_ratio": config.base_learning_rate,
             },
         },
+        "zero_optimization": {
+            "stage": 2,
+            "contiguous_gradients": True,
+            "overlap_comm": True,
+            "reduce_scatter": True,
+            "reduce_bucket_size": 5e8,
+            "allgather_bucket_size": 5e8,
+        },
         "gradient_accumulation_steps": 1,
-        "gradient_clipping": 3.0,
+        "gradient_clipping": config.gradient_clipping,
         "steps_per_print": 2000,
         "train_batch_size": config.batch_size,
         "train_micro_batch_size_per_gpu": (
@@ -227,11 +234,13 @@ def main(args):
         "wall_clock_breakdown": False,
     }
 
+    parameters = [p for p in model.parameters() if p.requires_grad]
+
     (dist_model, distr_opt, distr_dl, distr_sched) = distr_backend.distribute(
         args=config,
         model=model,
         optimizer=opt if not using_deepspeed else None,
-        model_parameters=model.parameters(),
+        model_parameters=parameters,
         training_data=ds if using_deepspeed else dl,
         lr_scheduler=sched if not using_deepspeed else None,
         config_params=deepspeed_config,
@@ -252,6 +261,31 @@ def main(args):
         )
     )
 
+    chk_top1_val = 0
+    chk_epoch = 0
+
+    if config.PeIT.finetune_checkpoint != "":
+        _, states = dist_model.load_checkpoint(
+            config.PeIT.finetune_checkpoint,
+        )
+        chk_epoch, chk_top1_val = states["epoch"], states["top1_val"]
+        print(
+            "---> Model loaded from: {}.\n\tLast epoch: {}.\n\tTop1 Validation: {:3.2f}".format(
+                config.PeIT.finetune_checkpoint, chk_epoch, chk_top1_val
+            )
+        )
+    # Let's create the sub folder for saving the checkpoints
+    base_directory = Path(config.PeIT.checkpoint_root_folder)
+    full_path = base_directory / config.PeIT.custom_run_name
+    if not full_path.exists():
+        # Let's error if the folder exist!
+        full_path.mkdir(parents=True, exist_ok=True)
+    elif any(full_path.iterdir()):
+        raise FileExistsError(
+            "XXX> The folder has already been created and it's not empty."
+        )
+
+    run = None
     if distr_backend.is_root_worker():
         # weights & biases experiment tracking
 
@@ -260,7 +294,6 @@ def main(args):
         model_config = dict(
             name=args.model,
             img_size=config.DATASET.Heatmap_Generator.heatmap_size,
-            dvae_img_size=config.DATASET.second_heatmap_size,
             in_chans=config.DATASET.window_size,
             pretrained=False,
             drop_path_rate=args.drop_path,
@@ -268,27 +301,30 @@ def main(args):
             use_shared_rel_pos_bias=args.rel_pos_bias,
             use_abs_pos_emb=args.abs_pos_emb,
             init_values=args.layer_scale_init_value,
+            saved_dir=full_path,
         )
 
         run = wandb.init(
             project="BEiT_window_{}_model_{}".format(
                 config.DATASET.window_size, args.model
             ),
-            job_type="training",
+            job_type="pre-training",
             config=model_config,
         )
 
+    start_epoch = max(0, chk_epoch)
+    acc_top = max(0.0, chk_top1_val)
     global_step = 0
-    val_top1 = 0.0
 
     nprocs = distr_backend.get_world_size()
     print("===> The word size is {}".format(nprocs))
 
-    for epoch in range(config.epochs):
+    for epoch in range(start_epoch, config.epochs):
         top1 = AverageMeter()
         top5 = AverageMeter()
         for i, batch in enumerate(distr_dl):
-            model.train()
+            batch = next(iter(distr_dl))
+            dist_model.train()
 
             if len(batch) == 2:
                 heatmaps, bool_masked_pos = batch
@@ -307,14 +343,12 @@ def main(args):
                 labels = input_ids[bool_masked_pos]
 
             with torch.cuda.amp.autocast():
-                outputs = model(
+                outputs = dist_model(
                     heatmaps,
                     bool_masked_pos=bool_masked_pos,
                     return_all_tokens=False,
                 )
                 loss = nn.CrossEntropyLoss()(input=outputs, target=labels)
-
-            loss_value = loss.item()
 
             if using_deepspeed:
                 # Gradients are automatically zeroed after the step
@@ -358,8 +392,7 @@ def main(args):
                         **logs,
                         "Top-1 (Training)": top1.avg,
                         "Top-5 (Training)": top5.avg,
-                        "epoch": epoch,
-                        "iter": i,
+                        "epoch": epoch + 1,
                         "loss": avg_loss.item(),
                         "label hist.": wandb.Histogram(labels.detach().cpu().numpy()),
                         "lr": lr,
@@ -368,52 +401,22 @@ def main(args):
                 wandb.log(logs)
             global_step += 1
 
-        if distr_backend.is_root_worker() and val_top1 < top1.avg:
-            # save trained model to wandb as an artifact every epoch's end
-            print(
-                "-> Saving model for acc: {:.2f} and loss: {:.2f}".format(
-                    top1.avg, avg_loss.item()
-                )
-            )
+        if acc_top < top1.avg:
+
+            print("-> Saving model for acc: {:.2f} ".format(top1.avg))
             save_model(
-                "./saved_models/beit_best_{}.pt".format(run.name),
-                model_config,
+                full_path,
                 using_deepspeed,
                 dist_model,
                 distr_backend,
                 model,
+                epoch=epoch + 1,
+                acc_top1=top1.avg,
+                run_name=run.name if run is not None else "",
             )
-            """
-            model_artifact = wandb.Artifact(
-                "trained-model", type="model", metadata=model_config
-            )
-            model_artifact.add_file("./saved_models/beit_{}.pt".format(epoch))
-            run.log_artifact(model_artifact)
-            """
-            val_top1 = top1.avg
+            acc_top = top1.avg
 
     if distr_backend.is_root_worker():
-        # save final vae and cleanup
-
-        save_model(
-            "./saved_models/beit_final_{}.pt".format(run.name),
-            model_config,
-            using_deepspeed,
-            dist_model,
-            distr_backend,
-            model,
-        )
-        wandb.save(
-            "./saved_models/beit_final.pt".format(run.name),
-        )
-
-        if epoch % 5 == 0:
-            model_artifact = wandb.Artifact(
-                "trained-vae", type="model", metadata=dict(args.model)
-            )
-            model_artifact.add_file("pert-final.pt")
-            run.log_artifact(model_artifact)
-
         wandb.finish()
 
 
