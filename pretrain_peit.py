@@ -69,6 +69,7 @@ def get_model(args):
         use_shared_rel_pos_bias=args.rel_pos_bias,
         use_abs_pos_emb=args.abs_pos_emb,
         init_values=args.layer_scale_init_value,
+        vocab_size=config.VAE_Params.num_tokens,
         single_cnn=not (args.disable_single_cnn),
     )
 
@@ -174,14 +175,16 @@ def main(args):
         persistent_workers=True,
     )
 
+    iteration_size = len(dl)
+
     opt = Adam(
         model.parameters(),
         lr=config.base_learning_rate,
         weight_decay=config.weight_decay,
     )
 
-    step_size_up = int(config.coeff_step_size_up * len(dl))
-    step_size_down = int(config.coeff_step_size_down * len(dl))
+    step_size_up = int(config.coeff_step_size_up * iteration_size)
+    step_size_down = int(config.coeff_step_size_down * iteration_size)
 
     sched = CyclicLR(
         optimizer=opt,
@@ -198,7 +201,7 @@ def main(args):
     distr_backend.check_batch_size(config.batch_size)
 
     deepspeed_config = {
-        "fp16": {"enabled": True},
+        "fp16": {"enabled": config.fp16_training},
         "bf16": {"enabled": False},
         "optimizer": {
             "type": "AdamW",
@@ -210,7 +213,7 @@ def main(args):
         "scheduler": {
             "type": "WarmupCosineLR",
             "params": {
-                "total_num_steps": config.epochs * len(dl),
+                "total_num_steps": config.epochs * iteration_size,
                 "warmup_min_ratio": 0,
                 "warmup_num_steps": step_size_up,
                 "cos_min_ratio": config.base_learning_rate,
@@ -302,6 +305,7 @@ def main(args):
             use_abs_pos_emb=args.abs_pos_emb,
             init_values=args.layer_scale_init_value,
             saved_dir=full_path,
+            iteration_size=iteration_size,
         )
 
         run = wandb.init(
@@ -323,7 +327,6 @@ def main(args):
         top1 = AverageMeter()
         top5 = AverageMeter()
         for i, batch in enumerate(distr_dl):
-            batch = next(iter(distr_dl))
             dist_model.train()
 
             if len(batch) == 2:
@@ -379,6 +382,25 @@ def main(args):
             top1.update(reduced_acc1, heatmaps.size(0))
             top5.update(reduced_acc5, heatmaps.size(0))
 
+            if using_deepspeed:
+                total_norm = dist_model.get_global_grad_norm()
+            else:
+                parameters = [
+                    p
+                    for p in dist_model.parameters()
+                    if p.grad is not None and p.requires_grad
+                ]
+                if len(parameters) == 0:
+                    total_norm = 0.0
+                else:
+                    device = parameters[0].grad.device
+                    total_norm = torch.norm(
+                        torch.stack(
+                            [torch.norm(p.grad.detach()).to(device) for p in parameters]
+                        ),
+                        2.0,
+                    ).item()
+
             if distr_backend.is_root_worker():
                 if i % 10 == 0:
                     # Will be engin.step() will be ignored if the fp16 has overflow
@@ -394,6 +416,7 @@ def main(args):
                         "Top-5 (Training)": top5.avg,
                         "epoch": epoch + 1,
                         "loss": avg_loss.item(),
+                        "Grad. Norm.": total_norm,
                         "label hist.": wandb.Histogram(labels.detach().cpu().numpy()),
                         "lr": lr,
                     }
