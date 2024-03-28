@@ -129,6 +129,7 @@ def main(args):
     print(args)
 
     args.config = config
+    args.model = config.PeIT.model
 
     device = torch.device(config.device)
 
@@ -202,9 +203,9 @@ def main(args):
         config.batch_size,
         shuffle=False,
         sampler=val_sampler,
-        num_workers=(config.num_workers // 2),
-        pin_memory=True,
-        persistent_workers=(config.num_workers > 0),
+        num_workers=config.num_workers,
+        pin_memory=False,
+        persistent_workers=False,
         drop_last=False,
     )
 
@@ -394,6 +395,8 @@ def main(args):
             top1.update(reduced_acc1, heatmaps.size(0))
             top5.update(reduced_acc5, heatmaps.size(0))
 
+            torch.distributed.barrier()
+
             if distr_backend.is_root_worker():
                 if i % 100 == 0:
                     # Will be engin.step() will be ignored if the fp16 has overflow
@@ -409,8 +412,7 @@ def main(args):
                         "Top-5 (Training)": top5.avg,
                         "Max Top-1 (Validation)": val_top1,
                         "Max Top-5 (Validation)": val_top5,
-                        "epoch": epoch,
-                        "iter": i,
+                        "epoch": epoch + 1,
                         "loss": avg_loss.item(),
                         "lr": lr,
                     }
@@ -419,40 +421,40 @@ def main(args):
 
             global_step += 1
 
-        # End of one epoch
-        print("-> Starting validation...")
-        start = time.time()
-        acc_val = validate(
-            model,
-            dl_val,
-            device,
-            using_deepspeed=using_deepspeed,
-            nprocs=nprocs,
-        )
-        end = time.time()
-        print("Validation took: {}".format(end - start))
-
-        if val_top1 < acc_val[0]:
-            # save trained model to wandb as an artifact every epoch's end
-
-            print("-> Saving model for acc: {:.2f} ".format(top1.avg))
-            if not using_deepspeed:
-                chk_path = str(
-                    full_path / "beit_best_{}_finetuning.pt".format(run.name)
+            if (i % (len(dl_train) // config.repeated_size_of_dataset) == 0) and i > 0:
+                print("-> Starting validation...")
+                start = time.time()
+                acc_val = validate(
+                    model,
+                    dl_val,
+                    device,
+                    using_deepspeed=using_deepspeed,
+                    nprocs=nprocs,
                 )
-            else:
-                chk_path = str(full_path)
-            save_model(
-                chk_path,
-                using_deepspeed,
-                dist_model,
-                distr_backend,
-                model,
-                epoch=epoch + 1,
-                top1_val=acc_val[0],
-            )
-            val_top1 = acc_val[0]
-            val_top5 = acc_val[1]
+                end = time.time()
+                print("Validation took: {}".format(end - start))
+
+                if val_top1 < acc_val[0]:
+                    # save trained model to wandb as an artifact every epoch's end
+
+                    print("-> Saving model for acc: {:.2f} ".format(top1.avg))
+                    if not using_deepspeed:
+                        chk_path = str(
+                            full_path / "beit_best_{}_finetuning.pt".format(run.name)
+                        )
+                    else:
+                        chk_path = str(full_path)
+                    save_model(
+                        chk_path,
+                        using_deepspeed,
+                        dist_model,
+                        distr_backend,
+                        model,
+                        epoch=epoch + 1,
+                        top1_val=acc_val[0],
+                    )
+                    val_top1 = acc_val[0]
+                    val_top5 = acc_val[1]
 
     if distr_backend.is_root_worker():
         wandb.finish()

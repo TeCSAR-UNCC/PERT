@@ -17,6 +17,7 @@ world_size: 3
 num_workers: *bts
 gradient_clipping: 1.0
 fp16_training: true
+wandb_log_dir: '/mnt/DATASETS_RAID_28TB/WAND_B/current/'
 
 #NOTE: Not sure what it is.
 transparent: true 
@@ -32,7 +33,7 @@ DATASET:
   root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
   window_size: &dws 48 # Dataset Window Size
   frame_interval: 1
-  stride: 60
+  stride: 30
   joint_req: 0.9
   test_subset: 'validation'
   train_subset: 'train'
@@ -68,14 +69,14 @@ VAE_Params:
   use_SiLU: True
 
 Pretrained_Models:
-    discrete_vae_weight_path: './saved_models/vae_48_panoptic_sparkling-dust-77.pt'
+    discrete_vae_weight_path: '/mnt/DATASETS_RAID_28TB/saved_models/03_16/saved_models/vae_48_panoptic_sparkling-dust-77.pt'
     prefix_saved_file: ''
 
 PeIT:
   model: 'beit_large_patch16'
-  finetune_checkpoint: ''
-  checkpoint_root_folder: './saved_models/'
-  custom_run_name: 'Pre_RUN1_dVAE_sparkling_dust_77_50Epoch'
+  finetune_checkpoint: '/mnt/DATASETS_RAID_28TB/saved_models/03_16/saved_models/Pre_large_RUN1_dVAE_sparkling_dust_77_50Epoch/'
+  checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
+  custom_run_name: 'Pre_large_RUN2_dVAE_sparkling_dust_77_50Epoch'
   window_size:
     - 0
     - 0

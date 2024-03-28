@@ -622,6 +622,12 @@ def beit_base_patch16_384(pretrained=False, **kwargs):
 
 @register_model
 def beit_large_patch16_224(pretrained=False, **kwargs):
+    if "pretrained_cfg" in kwargs:
+        kwargs.pop("pretrained_cfg")
+
+    if "pretrained_cfg_overlay" in kwargs:
+        kwargs.pop("pretrained_cfg_overlay")
+
     model = VisionTransformer(
         patch_size=16,
         embed_dim=1024,

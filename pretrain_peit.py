@@ -110,7 +110,7 @@ def save_model(
     # Fixme: Add optimizer and scheduler states here.
     save_obj = {**save_obj, "weights": model.state_dict()}
 
-    file_name = full_path / "beit_best_{}_finetuning.pt".format(run_name)
+    file_name = full_path / "beit_best_{}_pretraining.pt".format(run_name)
 
     torch.save(save_obj, str(file_name))
 
@@ -306,6 +306,7 @@ def main(args):
             init_values=args.layer_scale_init_value,
             saved_dir=full_path,
             iteration_size=iteration_size,
+            wandb_dir=config.wandb_log_dir,
         )
 
         run = wandb.init(
@@ -314,6 +315,7 @@ def main(args):
             ),
             job_type="pre-training",
             config=model_config,
+            dir=config.wandb_log_dir,
         )
 
     start_epoch = max(0, chk_epoch)
