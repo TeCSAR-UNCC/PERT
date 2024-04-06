@@ -9,6 +9,64 @@ from imgaug.augmentables import Keypoint, KeypointsOnImage
 from collections import OrderedDict
 
 
+def draw_pose_skeleton(heatmap, color_palette):
+    """
+    Draw a pose skeleton on a 256x256 image.
+
+    :param points: List of tuples representing the (x, y) coordinates of the 17 key points.
+    """
+    # Create a blank 256x256 image with 3 channels (RGB) and white background
+    import matplotlib.pyplot as plt
+
+    J, _, _ = heatmap.shape
+
+    # Plot each point and label it
+    fig, ax = plt.subplots()
+    for i in range(J):
+        # Normalize the heatmap for display
+        normalized_heatmap = cv2.normalize(heatmap[i], None, 0, 255, cv2.NORM_MINMAX)
+        max_pos = np.unravel_index(
+            normalized_heatmap.argmax(), normalized_heatmap.shape
+        )
+        y, x = max_pos
+        ax.plot(x, y, "x", color=color_palette.colors[i])  # Draw point
+        ax.text(x - 0.2, y + 0.2, str(i), color=color_palette.colors[i], fontsize=8)
+
+    ax.set_xlim(0, 256)
+    ax.set_ylim(256, 0)
+    fig.savefig("./test_fig/fig_full.png")
+
+
+def create_distinct_color_palette(n_colors=17):
+    """
+    Create a color palette with n_colors unique and visually distinguishable colors.
+
+    This approach attempts to maximize the perceptual difference between the colors.
+    We'll use the 'tab20' colormap which contains a set of 20 well distinguishable colors.
+    Since we need only 17, we'll pick 17 from this set.
+
+    :param n_colors: The number of unique colors to generate.
+    :return: A matplotlib colormap object.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import ListedColormap
+
+    # Use 'tab20' as it provides a set of well distinguishable colors
+    tab20 = plt.get_cmap("tab20", n_colors)
+
+    # Extract the RGB values for the colormap
+    colors = tab20(np.linspace(0, 1, n_colors))
+
+    # Create a new colormap from these colors
+    custom_cmap = ListedColormap(colors)
+
+    return custom_cmap
+
+
+# Create a new 17-color palette that's more distinguishable
+distinct_color_palette = create_distinct_color_palette(17)
+
+
 def heatmap_visualization(heatmap, video_name="heatmap_video.mp4"):
 
     frame_height, frame_width = heatmap.shape[1], heatmap.shape[2]

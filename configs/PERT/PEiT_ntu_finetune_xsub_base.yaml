@@ -1,14 +1,14 @@
 
 # Training settings
-epochs: 20
+epochs: 25
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
-base_learning_rate: 1.0e-9
+base_learning_rate: 1.0e-8
 max_learning_rate: 1.0e-4
-coeff_step_size_up: 0.2
-coeff_step_size_down: 20
-weight_decay: 0.3 # Learning rate decay
+coeff_step_size_up: 1
+coeff_step_size_down: 24
+weight_decay: 0.05
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
@@ -45,9 +45,9 @@ Pretrained_Models:
 
 PeIT:
   model: 'beit_base_patch16_224'
-  finetune_checkpoint: ''
+  finetune_checkpoint: '/mnt/DATASETS_RAID_28TB/saved_models/current/NTU_RUN6_PreTrained_base_Learning_Proud-Sea_15Epoch'
   checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
-  custom_run_name: 'NTU_RUN4_PreTrained_base_Learning_Proud-Sea_15Epoch'
+  custom_run_name: 'NTU_RUN7_PreTrained_base_Learning_Proud-Sea_15Epoch'
   window_size:
     - 0
     - 0

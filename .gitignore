@@ -1,6 +1,12 @@
 # wandb
 wandb/
 
+#saved model
+*.pt
+
+#Figure test director
+test_fig/
+
 # For profiling
 Profiling/
 

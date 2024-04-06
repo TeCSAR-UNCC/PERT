@@ -33,7 +33,7 @@ DATASET:
   train_dataset: 'panoptic'
   test_dataset: 'panoptic'
   root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
-  window_size: &dws 48 # Dataset Window Size
+  window_size: &dws 64 # Dataset Window Size
   frame_interval: 1
   stride: 90
   joint_req: 0.9
@@ -60,7 +60,7 @@ DATASET:
 VAE_Params:
   image_size: *hms
   num_layers: 4 # Number of layers (should be 3 or above)
-  num_tokens: 2048 # Number of image tokens
+  num_tokens: 4096 # Number of image tokens
   codebook_dim: 512
   hidden_dim: 256
   channels: *dws

@@ -6,7 +6,11 @@ from configs.config import update_config
 import dataset
 import numpy as np
 from utils import view_skeleton_batch
-from utils.axu import heatmap_visualization
+from utils.axu import (
+    heatmap_visualization,
+    create_distinct_color_palette,
+    draw_pose_skeleton,
+)
 from utils.heatmap_related import GeneratePoseTarget
 from pyskl.datasets.builder import build_from_cfg, build_dataset
 from pyskl.models.builder import build_model
@@ -19,16 +23,6 @@ from utils.get_dVAE import get_dVAE
 
 import torch
 from vector_quantize_pytorch import VectorQuantize
-
-vq = VectorQuantize(
-    dim=512,
-    codebook_size=8192,
-    codebook_dim=512,  # paper proposes setting this to 32 or as low as 8 to increase codebook usage
-    accept_image_fmap=True,
-)
-
-x = torch.randn(1, 8192, 16, 16)
-quantized, indices, commit_loss = vq(x)
 
 
 def parse_args():
@@ -58,9 +52,13 @@ def load_ntu_pkl():
     size = len(ds)
 
     idx = random.randint(0, size)
-    imgs, _ = ds.__getitem__(idx)
+    data = ds.__getitem__(idx)
+    imgs = data["imgs"]
     imgs = imgs.squeeze(0)
     imgs = imgs.permute((1, 0, 2, 3))
+    J = imgs.shape[1]
+    color_palette = create_distinct_color_palette(J)
+    draw_pose_skeleton(imgs[0].numpy(), color_palette)
     imgs, _ = imgs.max(axis=1)
     heatmap_visualization(imgs.numpy())
 

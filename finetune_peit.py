@@ -404,7 +404,7 @@ def main(args):
                         lr = distr_sched.get_last_lr()[0]
                     except:
                         lr = float("nan")
-                    print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
+                    print(epoch + 1, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
 
                     logs = {
                         **logs,

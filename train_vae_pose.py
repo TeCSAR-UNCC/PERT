@@ -345,11 +345,11 @@ for epoch in range(config.epochs):
                 except:
                     lr = float("nan")
 
-                print(epoch, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
+                print(epoch + 1, i, f"lr - {lr:6f} loss - {avg_loss.item()}")
 
                 logs = {
                     **logs,
-                    "epoch": epoch,
+                    "epoch": epoch + 1,
                     "iter": i,
                     "loss": avg_loss.item(),
                     "Epcoh loss": loss_per_epoch.avg,

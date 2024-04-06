@@ -1,7 +1,3 @@
-custom_imports = dict(
-    imports=["dataset.pipeline.ExpandSlowMotion"], allow_failed_imports=False
-)
-
 model = dict(
     type="Recognizer3D",
     backbone=dict(
