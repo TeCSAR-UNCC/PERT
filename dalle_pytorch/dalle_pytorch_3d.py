@@ -234,7 +234,7 @@ class Discrete3DVAE(nn.Module):
         self.encoder = nn.Sequential(*enc_layers)
         self.decoder = nn.Sequential(*dec_layers)
 
-        self.loss_fn = F.smooth_l1_loss if smooth_l1_loss else F.mse_loss
+        self.loss_fn = nn.SmoothL1Loss(beta=0.5) if smooth_l1_loss else F.mse_loss
 
         # take care of normalization within class
         """
