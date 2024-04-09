@@ -27,7 +27,7 @@ distributed_backend: true
 DATASET:
   train_dataset: 'ntu_mmcv'
   test_dataset: 'ntu_mmcv'
-  window_size: &dws 48 # Dataset Window Size
+  window_size: &dws 64 # Dataset Window Size
   second_heatmap_size: &dVAE_heatmap_size null
   num_classes: 120
   mmcv_config: 'configs/nturgbd/ntu120_limb_xsub.py'
@@ -39,14 +39,14 @@ DATASET:
 
 Pretrained_Models:
   discrete_vae_weight_path: ''
-  pretrain_saved_file: '/mnt/DATASETS_RAID_28TB/saved_models/current/Pre_large_RUN2_dVAE_sparkling_dust_77_50Epoch/beit_best_ethereal-water-7_finetuning.pt'
+  pretrain_saved_file: '/mnt/DATASETS_RAID_28TB/saved_models/current/Pre_large_RUN1_dVAE_divine-gorge_4_W64_50Epoch/beit_best_silvery-universe-1_pretraining.pt'
 
 
 PeIT:
   model: 'beit_large_patch16_224'
   finetune_checkpoint: ''
   checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current/'
-  custom_run_name: 'NTU_RUN6_PreTrained_large_Learning_sparkling_dust_77_15Epoch'
+  custom_run_name: 'NTU_RUN1_PreTrained_large_Learning_silvery_universe_1_25Epoch_WS64'
   window_size:
     - 0
     - 0

@@ -316,7 +316,9 @@ class GeneratePoseTarget:
         img_dims=(1080, 1920),
         scaling=1.0,
         is_training=False,
+        collapse_joints=False,
     ):
+        self.collapse_joints = collapse_joints
         self.sigma = sigma
         self.use_score = use_score
         self.use_gaussian_score = use_gaussian_score
@@ -613,8 +615,11 @@ class GeneratePoseTarget:
                 indices[r] = l
             heatmap_flip = heatmap[..., ::-1][:, indices]
             heatmap = np.concatenate([heatmap, heatmap_flip])
-        combined_heatmaps = heatmap.max(axis=1)
-        return combined_heatmaps, kpt
+
+        if self.collapse_joints:
+            return heatmap.max(axis=1), kpt
+        else:
+            return heatmap, kpt
 
     def __repr__(self):
         repr_str = (

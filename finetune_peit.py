@@ -313,7 +313,9 @@ def main(args):
         full_path.mkdir(parents=True, exist_ok=True)
     elif any(full_path.iterdir()):
         raise FileExistsError(
-            "XXX> The folder has already been created and it's not empty."
+            "XXX> The folder `{}` has already been created and it's not empty.".format(
+                str(full_path)
+            )
         )
 
     if distr_backend.is_root_worker():

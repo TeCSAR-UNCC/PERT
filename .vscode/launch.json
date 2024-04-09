@@ -97,7 +97,7 @@
       "program": "testing_things.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/PEiT_ntu_finetune_xsub_base.yaml"]
+      "args": ["--cfg", "configs/PERT/PEiT_panoptic_large.yaml"]
     },
     {
       "name": "dVAE",
@@ -107,6 +107,19 @@
       "console": "integratedTerminal",
       "justMyCode": true,
       "args": ["--cfg", "configs/dVAE/dVAE_2d4x_res1x.yaml"],
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "1",
+        "WANDB_MODE": "offline"
+      }
+    },
+    {
+      "name": "d3DVAE",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "train_vae_3dpose.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/dVAE/dVAE_3d4x_res1x.yaml"],
       "env": {
         "CUDA_VISIBLE_DEVICES": "1",
         "WANDB_MODE": "offline"

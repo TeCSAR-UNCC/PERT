@@ -51,7 +51,7 @@ def load_ntu_pkl():
     # ds = ntu_mmcv(config, False)
     size = len(ds)
 
-    idx = random.randint(0, size)
+    idx = 36051  # random.randint(0, size)
     data = ds.__getitem__(idx)
     imgs = data["imgs"]
     imgs = imgs.squeeze(0)
@@ -61,16 +61,15 @@ def load_ntu_pkl():
     draw_pose_skeleton(imgs[0].numpy(), color_palette)
     imgs, _ = imgs.max(axis=1)
     heatmap_visualization(imgs.numpy())
-
     dVAE = get_dVAE(config)
     dVAE = dVAE.to(device)
 
     data = np.expand_dims(imgs, 0)
     data = torch.from_numpy(data).to(device)
 
-    temp = 0.8146
+    temp = 0.46165
 
-    _, recons = dVAE(data, return_loss=True, return_recons=True, temp=temp)
+    recons = dVAE(data, return_loss=False, return_recons=True, temp=temp)
 
     recons = np.array(recons[0].cpu().detach().numpy())
     heatmap_visualization(recons, "ntu_recon_mmcv.mp4")
@@ -81,30 +80,32 @@ def load_ntu_pkl():
 def main():
     args = parse_args()
 
-    train_dataset = eval("dataset." + config.DATASET.train_dataset)(
-        config, is_training=True
-    )
-    train_dataset = eval("dataset." + config.DATASET.test_dataset)(
-        config, is_training=False
-    )
+    ds = eval("dataset." + config.DATASET.test_dataset)(config, is_training=False)
 
     # vf_idx = 95000
-    vf_idx = 5724
+    vf_idx = random.randint(0, len(ds))
 
     # data, gt, _, mask, meta, padding = train_dataset.__getitem__(vf_idx)
-    data = train_dataset.__getitem__(vf_idx)
-    combined_heatmaps = data[0]
+    data = ds.__getitem__(vf_idx)
+    combined_heatmaps = data
+
+    J = combined_heatmaps.shape[1]
+    color_palette = create_distinct_color_palette(J)
+    draw_pose_skeleton(combined_heatmaps[0], color_palette, filename="pant")
+
+    if not config.DATASET.Heatmap_Generator.collapse_joints:
+        video_heatmaps = combined_heatmaps.max(axis=1)
 
     video_name = "heatmap_video.mp4"
-    frame_height, frame_width = combined_heatmaps.shape[1], combined_heatmaps.shape[2]
+    frame_height, frame_width = video_heatmaps.shape[1], video_heatmaps.shape[2]
     out = cv2.VideoWriter(
         video_name, cv2.VideoWriter_fourcc(*"MP4V"), 30, (frame_width, frame_height)
     )
 
-    for i in range(combined_heatmaps.shape[0]):
+    for i in range(video_heatmaps.shape[0]):
         # Normalize the heatmap for display
         normalized_heatmap = cv2.normalize(
-            combined_heatmaps[i], None, 0, 255, cv2.NORM_MINMAX
+            video_heatmaps[i], None, 0, 255, cv2.NORM_MINMAX
         )
         colored_heatmap = cv2.applyColorMap(
             normalized_heatmap.astype("uint8"), cv2.COLORMAP_JET
@@ -119,3 +120,4 @@ def main():
 
 if __name__ == "__main__":
     load_ntu_pkl()
+    # main()

@@ -9,7 +9,7 @@ from imgaug.augmentables import Keypoint, KeypointsOnImage
 from collections import OrderedDict
 
 
-def draw_pose_skeleton(heatmap, color_palette):
+def draw_pose_skeleton(heatmap, color_palette, filename="fig_full"):
     """
     Draw a pose skeleton on a 256x256 image.
 
@@ -34,7 +34,7 @@ def draw_pose_skeleton(heatmap, color_palette):
 
     ax.set_xlim(0, 256)
     ax.set_ylim(256, 0)
-    fig.savefig("./test_fig/fig_full.png")
+    fig.savefig("./test_fig/{}.png".format(filename))
 
 
 def create_distinct_color_palette(n_colors=17):
