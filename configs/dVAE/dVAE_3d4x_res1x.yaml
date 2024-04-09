@@ -3,12 +3,12 @@ epochs: 20
 #Not used for `triangular2` and `WarmUpCosineLR` cyclic!
 lr_decay: 0.99
 base_learning_rate: 1.0e-6
-max_learning_rate: 5.0e-4
+max_learning_rate: 1.0e-4
 gradient_clipping: 1
 coeff_step_size_up: 1
 coeff_step_size_down: 19
 weight_decay: 0.05 # Learning rate decay
-anneal_rate: 5.0e-8 # Temperature annealing rate
+anneal_rate: 5.0e-6 # Temperature annealing rate
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.46165 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
@@ -17,8 +17,8 @@ device: 'cuda'
 world_size: 2
 num_workers: *bts
 second_heatmap_size: &scnd_heatmap_size null
-kl_div_loss_weight_anneal_rate: 1.0e-2 # Temperature annealing rate
-zero_kl_div_loss_weight_at: 1.0e-7
+kl_div_loss_weight_anneal_rate: 0 # Temperature annealing rate
+zero_kl_div_loss_weight_at: 0
 starting_kl_weight: 0
 wandb_log_dir: '/mnt/DATASETS_RAID_28TB/WAND_B/current/'
 
@@ -37,7 +37,7 @@ DATASET:
   window_size: &dws 48 # Dataset Window Size
   frame_interval: 1
   stride: 90
-  plane_number: 17
+  plane_number: 16
   joint_req: 0.9
   test_subset: 'validation'
   train_subset: 'train'
@@ -68,7 +68,7 @@ VAE_Params:
   hidden_dim: 256
   channels: *dws
   num_resnet_blocks: 1 # Number of residual net blocks
-  smooth_l1_loss: true
+  smooth_l1_loss: false
   normalization: null
   use_SiLU: True
   

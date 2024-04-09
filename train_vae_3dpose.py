@@ -303,7 +303,7 @@ for epoch in range(config.epochs):
                     )
                 """
                 collapsed_heatmap = heatmaps.numpy().max(axis=2).astype("float32")
-                recons_heatmap = recons.numpy().astype("float32")
+                recons_heatmap = recons.numpy().max(axis=2).astype("float32")
                 heatmaps_rgb = convert_to_rgb_3d(collapsed_heatmap)
                 recons_rgb = convert_to_rgb_3d(recons_heatmap)
                 # hard_recons_rgb = convert_to_rgb_3d(hard_recons.numpy())

@@ -140,7 +140,7 @@ class Discrete3DVAE(nn.Module):
         image_size=256,
         num_tokens=512,
         codebook_dim=512,
-        plane_number=17,
+        plane_number=16,
         num_layers=3,
         num_resnet_blocks=0,
         hidden_dim=64,
@@ -185,35 +185,51 @@ class Discrete3DVAE(nn.Module):
         enc_layers = []
         dec_layers = []
 
-        for (enc_in, enc_out), (dec_in, dec_out) in zip(enc_chans_io, dec_chans_io):
+        exapnd_it = True
+        for i, ((enc_in, enc_out), (dec_in, dec_out)) in enumerate(
+            zip(enc_chans_io, dec_chans_io)
+        ):
             enc_layers.append(
                 nn.Sequential(
                     nn.Conv3d(
                         enc_in,
                         enc_out,
-                        (4, 4, 4),
+                        (2, 4, 4),
                         stride=(2, 2, 2),
                         padding=(1, 1, 1),
                     ),
                     activation(),
                 )
             )
+            exapnd_it = True if (i != self.num_layers - 1) else False
+            size_k = 4 if exapnd_it else 3
+            size_s = 2 if exapnd_it else 1
+            size_p = 1 if exapnd_it else 1
             dec_layers.append(
                 nn.Sequential(
-                    nn.ConvTranspose2d(dec_in, dec_out, 4, stride=2, padding=1),
+                    nn.ConvTranspose3d(
+                        dec_in,
+                        dec_out,
+                        (size_k, 4, 4),
+                        stride=(size_s, 2, 2),
+                        padding=(size_p, 1, 1),
+                    ),
                     activation(),
                 )
             )
 
         for _ in range(num_resnet_blocks):
-            dec_layers.insert(0, ResBlock(dec_chans[1], use_SiLU))
+            dec_layers.insert(0, ResBlock3D(dec_chans[1], use_SiLU))
             enc_layers.append(ResBlock3D(enc_chans[-1], use_SiLU))
 
         if num_resnet_blocks > 0:
-            dec_layers.insert(0, nn.Conv2d(codebook_dim, dec_chans[1], 1))
+            dec_layers.insert(
+                0,
+                nn.Sequential(nn.Conv3d(codebook_dim, dec_chans[1], 1)),
+            )
 
         enc_layers.append(nn.Conv3d(enc_chans[-1], num_tokens, 1))
-        dec_layers.append(nn.Conv2d(dec_chans[-1], channels, 1))
+        dec_layers.append(nn.Conv3d(dec_chans[-1], channels, 1))
 
         self.encoder = nn.Sequential(*enc_layers)
         self.decoder = nn.Sequential(*dec_layers)
@@ -262,9 +278,13 @@ class Discrete3DVAE(nn.Module):
     def decode(self, img_seq):
         image_embeds = self.codebook(img_seq)
         b, n, d = image_embeds.shape
-        h = w = int(sqrt(n))
+        j = self.plane_number // (2 ** (self.num_layers - 1))
+        hw = n // j
+        h = w = int(sqrt(hw))
 
-        image_embeds = rearrange(image_embeds, "b (h w) d -> b d h w", h=h, w=w)
+        image_embeds = rearrange(
+            image_embeds, "b (j h w) d -> b d j h w", h=h, w=w, j=j
+        )
         images = self.decoder(image_embeds)
         return images
 
@@ -289,7 +309,6 @@ class Discrete3DVAE(nn.Module):
         img = self.norm(img)
 
         logits = self.encoder(img)
-        logits = logits.squeeze(axis=2)
 
         if return_logits:
             return logits  # return logits for getting hard image indices for DALL-E training
@@ -308,20 +327,19 @@ class Discrete3DVAE(nn.Module):
             π2 = 2 * π1 - 0.5 * π0
             one_hot = π2 - π2.detach() + one_hot
 
-        sampled = einsum("b n h w, n d -> b d h w", one_hot, self.codebook.weight)
+        sampled = einsum("b n j h w, n d -> b d j h w", one_hot, self.codebook.weight)
         out = self.decoder(sampled)
 
         if not return_loss:
             return out
 
         # reconstruction loss
-        img_2d, _ = torch.max(img, dim=2)
 
-        recon_loss = self.loss_fn(img_2d, out)
+        recon_loss = self.loss_fn(img, out)
 
         # kl divergence
 
-        logits = rearrange(logits, "b n h w -> b (h w) n")
+        logits = rearrange(logits, "b n j h w -> b (j h w) n")
         log_qy = F.log_softmax(logits, dim=-1)
         log_uniform = torch.log(torch.tensor([1.0 / num_tokens], device=device))
         kl_div = F.kl_div(log_uniform, log_qy, None, None, "batchmean", log_target=True)
