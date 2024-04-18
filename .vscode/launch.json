@@ -13,6 +13,26 @@
       "justMyCode": true
     },
     {
+      "name": "Domain Shift",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "domain_shift.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": [
+        "--cfg",
+        "configs/PERT/PEiT_ntu_finetune_xsub_base.yaml",
+        "--py-cfg",
+        "configs/ntu2ucla/limb.py",
+        "--pysk-model-weight",
+        "/mnt/DATASETS_RAID_28TB/ActionsModels/ntu120_xsub_posec3d/limb.pth"
+      ],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "2"
+      }
+    },
+    {
       "name": "view_frames",
       "type": "debugpy",
       "request": "launch",
@@ -58,7 +78,7 @@
       "program": "finetune_peit.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/PEiT_ntu_finetune_xsub_large.yaml"],
+      "args": ["--cfg", "configs/PERT/PEiT_ucla_finetune_base.yaml"],
       "env": {
         "WANDB_MODE": "offline",
         "CUDA_VISIBLE_DEVICES": "1"
@@ -97,7 +117,7 @@
       "program": "testing_things.py",
       "console": "integratedTerminal",
       "justMyCode": true,
-      "args": ["--cfg", "configs/PERT/PEiT_panoptic_large.yaml"]
+      "args": ["--cfg", "configs/PERT/PEiT_panoptic_base.yaml"]
     },
     {
       "name": "dVAE",

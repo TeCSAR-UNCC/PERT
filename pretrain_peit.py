@@ -71,6 +71,7 @@ def get_model(args):
         init_values=args.layer_scale_init_value,
         vocab_size=config.VAE_Params.num_tokens,
         single_cnn=not (args.disable_single_cnn),
+        embed_3dpath=config.PeIT.embed_3dpath,
     )
 
     # Do we have a checkpoint to start from?
@@ -307,6 +308,7 @@ def main(args):
             saved_dir=full_path,
             iteration_size=iteration_size,
             wandb_dir=config.wandb_log_dir,
+            embed_3dpath=config.PeIT.embed_3dpath,
         )
 
         run = wandb.init(

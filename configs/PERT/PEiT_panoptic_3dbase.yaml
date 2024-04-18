@@ -77,7 +77,7 @@ PeIT:
   finetune_checkpoint: '/mnt/DATASETS_RAID_28TB/saved_models/03_16/saved_models/Pre_base_RUN1_dVAE_sparkling_dust_77_50Epoch/'
   checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
   custom_run_name: 'Pre_base_RUN2_dVAE_sparkling_dust_77_50Epoch'
-  embed_3dpath: false
+  embed_3dpath: true
   window_size:
     - 0
     - 0

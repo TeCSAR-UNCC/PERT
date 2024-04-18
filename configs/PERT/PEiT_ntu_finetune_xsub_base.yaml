@@ -48,6 +48,7 @@ PeIT:
   finetune_checkpoint: '/mnt/DATASETS_RAID_28TB/saved_models/current/NTU_RUN6_PreTrained_base_Learning_Proud-Sea_15Epoch'
   checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
   custom_run_name: 'NTU_RUN7_PreTrained_base_Learning_Proud-Sea_15Epoch'
+  patch_3d: true
   window_size:
     - 0
     - 0

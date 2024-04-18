@@ -37,21 +37,21 @@ def parse_args():
     return args
 
 
-def load_ntu_pkl():
+def load_mmcv_dataset():
     args = parse_args()
     device = torch.device(config.device)
 
-    cfg_file = "./configs/nturgbd/ntu120_limb_xsub.py"
+    cfg_file = "configs/ucla/pert_limb_ucla.py"
     cfg = Config.fromfile(cfg_file)
 
-    ds = build_dataset(cfg.data.val)
+    ds = build_dataset(cfg.data.train)
     model = build_model(cfg.model)
     # from dataset import ntu_mmcv
 
     # ds = ntu_mmcv(config, False)
     size = len(ds)
 
-    idx = 36051  # random.randint(0, size)
+    idx = random.randint(0, size)
     data = ds.__getitem__(idx)
     imgs = data["imgs"]
     imgs = imgs.squeeze(0)
@@ -119,5 +119,5 @@ def main():
 
 
 if __name__ == "__main__":
-    load_ntu_pkl()
-    # main()
+    load_mmcv_dataset()
+    main()

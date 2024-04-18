@@ -26,12 +26,12 @@ distributed_backend: true
 
 # Dataset Settings
 DATASET:
-  train_dataset: 'ntu_mmcv'
-  test_dataset: 'ntu_mmcv'
+  train_dataset: 'ucla_mmcv'
+  test_dataset: 'ucla_mmcv'
   window_size: &dws 48 # Dataset Window Size
   second_heatmap_size: &dVAE_heatmap_size null
-  num_classes: 120
-  mmcv_config: 'configs/nturgbd/ntu120_limb_xsub.py'
+  num_classes: 10
+  mmcv_config: 'configs/ucla/pert_limb_ucla.py'
 
   Heatmap_Generator:
     # You need to also update `mmcv_config` if you change this value to something else.
