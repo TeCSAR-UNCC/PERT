@@ -1,5 +1,4 @@
 
-# Training settings
 epochs: 25
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
@@ -12,10 +11,10 @@ weight_decay: 5.0e-4
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
-batch_size: &bs 16
+batch_size: &bs 8
 device: 'cuda'
 world_size: 2
-num_workers: 4
+num_workers: *bs
 repeated_size_of_dataset: 10
 
 #NOTE: Not sure what it is.
@@ -30,7 +29,8 @@ DATASET:
   test_dataset: 'ucla_mmcv'
   window_size: &dws 48 # Dataset Window Size
   second_heatmap: &dVAE_heatmap_size null
-  num_classes: 10
+  # Although UCLA has 10 num_classes but remmeber we are loading NTU models
+  num_classes: 120
   mmcv_config: 'configs/ucla/pert_limb_ucla.py'
 
   Heatmap_Generator:
@@ -40,14 +40,14 @@ DATASET:
 
 Pretrained_Models:
   discrete_vae_weight_path: ''
-  pretrain_saved_file: '/mnt/DATASETS_RAID_28TB/saved_models/current/Pre_base_RUN2_dVAE_sparkling_dust_77_50Epoch/beit_best_proud-sea-6_finetuning.pt'
+  pretrain_saved_file: '/mnt/DATASETS_RAID_28TB/saved_models/current/Pre_large_RUN1_dVAE_divine-gorge_4_W64_50Epoch/beit_best_silvery-universe-1_pretraining.pt'
 
 
 PeIT:
-  model: 'beit_base_patch16_224'
+  model: 'beit_large_patch16_224'
   finetune_checkpoint: ''
-  checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
-  custom_run_name: 'UCLA_RUN1_PreTrained_base_Learning_Proud-Sea_15Epoch'
+  checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current/'
+  custom_run_name: 'NTU_RUN1_PreTrained_large_Learning_silvery_universe_1_25Epoch_WS64'
   window_size:
     - 0
     - 0

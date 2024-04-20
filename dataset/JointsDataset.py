@@ -38,7 +38,7 @@ class JointsDataset(Dataset):
         max_num_frame_rate=0.9,
         is_training=True,
         linear_interpolate=False,
-        second_heatmap_size=None,
+        second_heatmap=None,
         num_clips=300,
         **kwargs,
     ):
@@ -70,7 +70,7 @@ class JointsDataset(Dataset):
         self.total_window = self.window_size * self.frame_interval
         self.db = []
         self.linear_interpolate = linear_interpolate
-        self.second_heatmap_size = second_heatmap_size
+        self.second_heatmap = second_heatmap
         self.is_training = is_training
         self.num_clip = num_clips
 
@@ -111,26 +111,17 @@ class JointsDataset(Dataset):
             data, kpts = self.heatmap_generator(np.expand_dims(data, axis=0))
 
         frames = []
-        if self.second_heatmap_size:
-            data_8b = 255 * data
-            for frame in data_8b:
-                im = Image.fromarray(frame.astype(np.uint8), mode="L")
-                im = im.resize(
-                    (self.second_heatmap_size, self.second_heatmap_size),
-                    resample=Image.LANCZOS,
-                )
-                frame_guss = np.array(im, dtype=np.float32) / 255
-                frames.append(frame_guss)
-
-            second_data = np.array(frames)
-            data = [data, second_data]
+        if self.second_heatmap:
+            # We are training on 3D heatmap, need to convert it for dVAE
+            dvae_data = data.max(axis=0)
+            data = [data, dvae_data]
 
         if self.masked_position_generator is not None:
-            if self.second_heatmap_size:
+            if self.second_heatmap:
                 data = [
                     *data,
                     self.masked_position_generator(
-                        heatmap=data, keypoints=kpts, is_training=self.is_training
+                        heatmap=dvae_data, keypoints=kpts, is_training=self.is_training
                     ),
                 ]
             else:

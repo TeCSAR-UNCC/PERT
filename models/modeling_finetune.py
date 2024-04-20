@@ -268,6 +268,7 @@ class PatchEmbed(nn.Module):
         hidden_dim=256,
         single_cnn=True,
         activation=nn.GELU,
+        embed_2dpatch=True,
     ):
         super().__init__()
         img_size = to_2tuple(img_size)
@@ -277,11 +278,27 @@ class PatchEmbed(nn.Module):
         self.img_size = img_size
         self.patch_size = patch_size
         self.num_patches = num_patches
+        self.embed_2dpatch = embed_2dpatch
 
         if single_cnn:
-            self.proj = nn.Conv2d(
-                in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
-            )
+            if not self.embed_2dpatch:
+                print("--> Creating the 3D Patch Embeding Layer...")
+
+                self.proj = nn.Sequential(
+                    nn.Conv3d(
+                        in_chans,
+                        embed_dim,
+                        kernel_size=(4, patch_size[1], patch_size[1]),
+                        stride=(1, patch_size[1], patch_size[1]),
+                    ),
+                    nn.BatchNorm3d(embed_dim),
+                    nn.AdaptiveMaxPool3d((1, patch_size[1], patch_size[1])),
+                )
+            else:
+                self.proj = nn.Conv2d(
+                    in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
+                )
+
         else:
             print("--> Creating the Embeding Layer...")
             from math import log2
@@ -295,84 +312,35 @@ class PatchEmbed(nn.Module):
 
             proj_layers = []
 
+            conve_layer = nn.Conv3d if embed_2dpatch else nn.Conv2d
+
             for proj_in, proj_out in enc_chans_io:
                 proj_layers.append(
                     nn.Sequential(
-                        nn.Conv2d(proj_in, proj_out, 4, stride=2, padding=1),
+                        conve_layer(proj_in, proj_out, 4, stride=2, padding=1),
                         activation(),
                     )
                 )
 
-            proj_layers.append(nn.Conv2d(proj_chans[-1], embed_dim, 1))
+            proj_layers.append(conve_layer(proj_chans[-1], embed_dim, 1))
+            if self.embed_2dpatch:
+                proj_layers.append(
+                    nn.AdaptiveAvgPool3d((1, num_patches, self.num_patches))
+                )
             self.proj = nn.Sequential(*proj_layers)
 
     def forward(self, x, **kwargs):
-        B, C, H, W = x.shape
-        # FIXME look at relaxing size constraints
-        assert (
-            H == self.img_size[0] and W == self.img_size[1]
-        ), f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
-        x = self.proj(x).flatten(2).transpose(1, 2)
-        return x
-
-
-class Patch3DEmbed(nn.Module):
-    """Image to Patch Embedding"""
-
-    def __init__(
-        self,
-        img_size=224,
-        patch_size=16,
-        in_chans=3,
-        embed_dim=768,
-        hidden_dim=256,
-        single_cnn=True,
-        activation=nn.GELU,
-    ):
-        super().__init__()
-        img_size = to_2tuple(img_size)
-        patch_size = to_2tuple(patch_size)
-        num_patches = (img_size[1] // patch_size[1]) * (img_size[0] // patch_size[0])
-        self.patch_shape = (img_size[0] // patch_size[0], img_size[1] // patch_size[1])
-        self.img_size = img_size
-        self.patch_size = patch_size
-        self.num_patches = num_patches
-
-        if single_cnn:
-            self.proj = nn.Conv2d(
-                in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
-            )
+        if not self.embed_2dpatch:
+            _, _, _, H, W = x.shape
         else:
-            print("--> Creating the Embeding Layer...")
-            from math import log2
-
-            num_layers = int(log2(img_size[0] / patch_size[0]))
-            prj_chans = [hidden_dim] * num_layers
-
-            proj_chans = [in_chans, *prj_chans]
-
-            enc_chans_io = list(zip(proj_chans[:-1], proj_chans[1:]))
-
-            proj_layers = []
-
-            for proj_in, proj_out in enc_chans_io:
-                proj_layers.append(
-                    nn.Sequential(
-                        nn.Conv3d(proj_in, proj_out, 4, stride=2, padding=1),
-                        activation(),
-                    )
-                )
-
-            proj_layers.append(nn.Conv3d(proj_chans[-1], embed_dim, 1))
-            self.proj = nn.Sequential(*proj_layers)
-
-    def forward(self, x, **kwargs):
-        B, C, H, W = x.shape
+            _, _, H, W = x.shape
         # FIXME look at relaxing size constraints
         assert (
             H == self.img_size[0] and W == self.img_size[1]
         ), f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
+
         x = self.proj(x).flatten(2).transpose(1, 2)
+
         return x
 
 

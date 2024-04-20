@@ -42,7 +42,7 @@ DATASET:
   # Some of the NTU video have just around 1 second.
   max_num_frame_rate: 0.9
   linear_interpolate: True
-  second_heatmap_size: &dVAE_heatmap_size null
+  second_heatmap: &dVAE_heatmap_size null
 
 
   # Heatmap Generator

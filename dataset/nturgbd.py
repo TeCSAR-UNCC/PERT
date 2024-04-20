@@ -433,12 +433,12 @@ class Action_Nturgbd(Nturgbd):
         cls = int(unq_videos.values[0, 0][-3:]) - 1
 
         frames = []
-        if self.second_heatmap_size:
+        if self.second_heatmap:
             data_8b = 255 * data
             for frame in data_8b:
                 im = Image.fromarray(frame.astype(np.uint8), mode="L")
                 im = im.resize(
-                    (self.second_heatmap_size, self.second_heatmap_size),
+                    (self.second_heatmap, self.second_heatmap),
                     resample=Image.LANCZOS,
                 )
                 frame_guss = np.array(im, dtype=np.float32) / 255
@@ -448,7 +448,7 @@ class Action_Nturgbd(Nturgbd):
             data = [data, second_data]
 
         if self.training_mode == "fine-tuning":
-            if self.second_heatmap_size:
+            if self.second_heatmap:
                 data = [*data, cls]
             else:
                 data = [data, cls]

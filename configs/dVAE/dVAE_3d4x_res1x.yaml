@@ -16,7 +16,7 @@ batch_size: &bts 16
 device: 'cuda'
 world_size: 2
 num_workers: *bts
-second_heatmap_size: &scnd_heatmap_size null
+second_heatmap: &scnd_heatmap_size null
 kl_div_loss_weight_anneal_rate: 1.0e-2 # Temperature annealing rate
 zero_kl_div_loss_weight_at: 1.0e-7
 starting_kl_weight: 0
@@ -25,8 +25,8 @@ wandb_log_dir: '/mnt/DATASETS_RAID_28TB/WAND_B/current/'
 #NOTE: Not sure what it is.
 transparent: true 
 
-deepspeed: true
-distributed_backend: true
+deepspeed: false
+distributed_backend: false
                                                              
 
 # Dataset Settings
@@ -37,7 +37,7 @@ DATASET:
   window_size: &dws 48 # Dataset Window Size
   frame_interval: 1
   stride: 90
-  plane_number: 17
+  joint_number: &jn 17
   joint_req: 0.9
   test_subset: 'validation'
   train_subset: 'train'
@@ -57,7 +57,7 @@ DATASET:
     with_kp: false
     heatmap_size: &hms 256 # Heatmap Size
     scaling: 1.0
-    collapse_joints: false
+    collapse_joints: &cj true
 
 # Model Settings
 VAE_Params:
@@ -66,7 +66,7 @@ VAE_Params:
   num_tokens: 8096 # Number of image tokens
   codebook_dim: 512
   hidden_dim: 256
-  channels: *dws
+  channels: *jn
   num_resnet_blocks: 1 # Number of residual net blocks
   smooth_l1_loss: true
   normalization: null

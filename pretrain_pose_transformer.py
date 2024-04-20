@@ -257,7 +257,7 @@ def main(args):
         model_config = dict(
             name=args.model,
             img_size=config.DATASET.Heatmap_Generator.heatmap_size,
-            dvae_img_size=config.DATASET.second_heatmap_size,
+            dvae_img_size=config.DATASET.second_heatmap,
             in_chans=config.DATASET.window_size,
             pretrained=False,
             drop_path_rate=args.drop_path,

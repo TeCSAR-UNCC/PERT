@@ -113,7 +113,7 @@ def get_args_transformer_finetune():
     return parser.parse_args()
 
 
-def get_args_finetune():
+def get_parsser_fintuned():
     parser = argparse.ArgumentParser("PERT pre-training script", add_help=False)
     config_group = parser.add_argument_group("Config")
     config_group.add_argument(
@@ -219,7 +219,11 @@ def get_args_finetune():
     parser.add_argument("--model_key", default="model|module", type=str)
     parser.add_argument("--model_prefix", default="", type=str)
 
-    return parser.parse_args()
+    return parser
+
+
+def get_args_finetune():
+    return get_parsser_fintuned().parse_args()
 
 
 def get_args():

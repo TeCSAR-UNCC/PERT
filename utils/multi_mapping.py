@@ -39,22 +39,44 @@ mapping_ucla2ntu = {
     9: [113],
 }
 
+mapping_ucla2ucla = {
+    0: [0],
+    1: [1],
+    2: [2],
+    3: [3],
+    4: [4],
+    5: [5],
+    6: [6],
+    7: [7],
+    8: [8],
+    9: [9],
+}
 
-def top1_accuracy(preds, targets, mapping):
-    correct = 0
-    for i, pred in enumerate(preds):
-        if targets[i] in mapping.get(pred, []):
-            correct += 1
-    return correct / len(preds)
 
+def calculate_accuracies(preds, targets, mapping):
+    top1_correct = 0
+    top5_correct = 0
+    total_items = 0
 
-def top5_accuracy(preds, targets, mapping):
-    # Assuming preds is a list of lists where each sublist is the top 5 predictions for that entry
-    correct = 0
-    for i, top_5 in enumerate(preds):
-        valid_targets = set()
-        for pred in top_5:
-            valid_targets.update(mapping.get(pred, []))
-        if targets[i] in valid_targets:
-            correct += 1
-    return correct / len(preds)
+    for pred_array, target_array in zip(preds, targets):
+        for i in range(len(target_array)):
+            target = target_array[i]
+            top5_preds = pred_array[i]
+
+            # Coressponding NTU labels:
+            cntu_mapping = mapping.get(target, [])
+
+            # Check top-1 accuracy
+            if top5_preds[0] in cntu_mapping:
+                top1_correct += 1
+
+            # Check top-5 accuracy
+            if np.isin(cntu_mapping, top5_preds).any():
+                top5_correct += 1
+
+        total_items += len(target_array)
+
+    top1_accuracy = top1_correct / total_items
+    top5_accuracy = top5_correct / total_items
+
+    return top1_accuracy, top5_accuracy

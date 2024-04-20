@@ -74,12 +74,12 @@ else:
 
 dl_train = DataLoader(
     ds,
-    config.batch_size,
+    1,  # config.batch_size,
     shuffle=data_sampler is None,
     sampler=data_sampler,
-    num_workers=config.num_workers,
+    num_workers=0,  # config.num_workers,
     pin_memory=True,
-    persistent_workers=(config.num_workers > 0),
+    persistent_workers=False,  # (config.num_workers > 0),
 )
 
 vae = Discrete3DVAE(**config.VAE_Params)

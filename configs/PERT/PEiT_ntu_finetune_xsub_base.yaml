@@ -29,7 +29,7 @@ DATASET:
   train_dataset: 'ntu_mmcv'
   test_dataset: 'ntu_mmcv'
   window_size: &dws 48 # Dataset Window Size
-  second_heatmap_size: &dVAE_heatmap_size null
+  second_heatmap: &dVAE_heatmap_size null
   num_classes: 120
   mmcv_config: 'configs/nturgbd/ntu120_limb_xsub.py'
 

@@ -45,7 +45,8 @@ DATASET:
   # Some of the NTU video have just around 1 second.
   max_num_frame_rate: 0.9
   linear_interpolate: False
-  second_heatmap_size: null
+  second_heatmap: true
+  joint_number: &jn 17
 
   # Heatmap Generator
   Heatmap_Generator:
@@ -54,6 +55,7 @@ DATASET:
     with_kp: false
     heatmap_size: &hms 256 # Heatmap Size
     scaling: 1.0
+    collapse_joints: &cj false
 
 # Model Settings
 VAE_Params:
@@ -74,10 +76,10 @@ Pretrained_Models:
 
 PeIT:
   model: 'beit_base_patch16'
-  finetune_checkpoint: '/mnt/DATASETS_RAID_28TB/saved_models/03_16/saved_models/Pre_base_RUN1_dVAE_sparkling_dust_77_50Epoch/'
+  finetune_checkpoint: ''
   checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
-  custom_run_name: 'Pre_base_RUN2_dVAE_sparkling_dust_77_50Epoch'
-  embed_3dpath: false
+  custom_run_name: 'RUN1_3D_HEATMAP_BASE'
+  embed_2dpatch: *cj
   window_size:
     - 0
     - 0

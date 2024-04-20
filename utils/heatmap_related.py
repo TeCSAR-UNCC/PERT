@@ -619,6 +619,7 @@ class GeneratePoseTarget:
         if self.collapse_joints:
             return heatmap.max(axis=1), kpt
         else:
+            heatmap = heatmap.transpose((1, 0, 2, 3))
             return heatmap, kpt
 
     def __repr__(self):

@@ -16,7 +16,7 @@ batch_size: &bts 16
 device: 'cuda'
 world_size: 2
 num_workers: *bts
-second_heatmap_size: &scnd_heatmap_size null
+second_heatmap: &scnd_heatmap_size null
 kl_div_loss_weight_anneal_rate: 1.0e-2 # Temperature annealing rate
 zero_kl_div_loss_weight_at: 1.0e-7
 starting_kl_weight: 0
@@ -55,12 +55,13 @@ DATASET:
     with_kp: false
     heatmap_size: &hms 256 # Heatmap Size
     scaling: 1.0
+    collapse_joints: true
 
 # Model Settings
 VAE_Params:
   image_size: *hms
   num_layers: 4 # Number of layers (should be 3 or above)
-  num_tokens: 4096 # Number of image tokens
+  num_tokens: 8192 # Number of image tokens
   codebook_dim: 512
   hidden_dim: 256
   channels: *dws

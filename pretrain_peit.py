@@ -59,10 +59,15 @@ import models
 
 def get_model(args):
     print(f"Creating model: {args.model}")
+    in_chan = (
+        config.DATASET.window_size
+        if config.PeIT.embed_2dpatch
+        else config.DATASET.joint_number
+    )
     model = create_model(
         args.model,
         img_size=config.DATASET.Heatmap_Generator.heatmap_size,
-        in_chans=config.DATASET.window_size,
+        in_chans=in_chan,
         pretrained=False,
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
@@ -71,7 +76,7 @@ def get_model(args):
         init_values=args.layer_scale_init_value,
         vocab_size=config.VAE_Params.num_tokens,
         single_cnn=not (args.disable_single_cnn),
-        embed_3dpath=config.PeIT.embed_3dpath,
+        embed_2dpatch=config.PeIT.embed_2dpatch,
     )
 
     # Do we have a checkpoint to start from?
@@ -308,7 +313,7 @@ def main(args):
             saved_dir=full_path,
             iteration_size=iteration_size,
             wandb_dir=config.wandb_log_dir,
-            embed_3dpath=config.PeIT.embed_3dpath,
+            embed_2dpatch=config.PeIT.embed_2dpatch,
         )
 
         run = wandb.init(
@@ -327,6 +332,7 @@ def main(args):
     nprocs = distr_backend.get_world_size()
     print("===> The word size is {}".format(nprocs))
 
+    embed_2dpatch = config.PeIT.embed_2dpatch
     for epoch in range(start_epoch, config.epochs):
         top1 = AverageMeter()
         top5 = AverageMeter()

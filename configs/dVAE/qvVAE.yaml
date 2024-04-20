@@ -15,7 +15,7 @@ batch_size: &bts 16
 device: 'cuda'
 world_size: 2
 num_workers: *bts
-second_heatmap_size: &scnd_heatmap_size null
+second_heatmap: &scnd_heatmap_size null
 gradient_clipping: 0
 
 

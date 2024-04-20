@@ -43,7 +43,7 @@ DATASET:
   # Some of the NTU video have just around 1 second.
   max_num_frame_rate: 0.9
   pad_last_frame: False
-  second_heatmap_size: &scnd_heatmap_size null
+  second_heatmap: &scnd_heatmap_size null
 
   # Heatmap Generator
   Heatmap_Generator:

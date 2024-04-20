@@ -140,7 +140,7 @@ class Discrete3DVAE(nn.Module):
         image_size=256,
         num_tokens=512,
         codebook_dim=512,
-        plane_number=17,
+        tempral_dim=48,
         num_layers=3,
         num_resnet_blocks=0,
         hidden_dim=64,
@@ -166,7 +166,7 @@ class Discrete3DVAE(nn.Module):
         self.reinmax = reinmax
 
         self.codebook = nn.Embedding(num_tokens, codebook_dim)
-        self.plane_number = plane_number
+        self.tempral_dim = tempral_dim
 
         hdim = hidden_dim
 
@@ -195,6 +195,7 @@ class Discrete3DVAE(nn.Module):
                         stride=(2, 2, 2),
                         padding=(1, 1, 1),
                     ),
+                    PrintModule(),
                     activation(),
                 )
             )
@@ -213,10 +214,12 @@ class Discrete3DVAE(nn.Module):
             dec_layers.insert(0, nn.Conv2d(codebook_dim, dec_chans[1], 1))
 
         enc_layers.append(nn.Conv3d(enc_chans[-1], num_tokens, 1))
-        dec_layers.append(nn.Conv2d(dec_chans[-1], channels, 1))
+        dec_layers.append(nn.Conv2d(dec_chans[-1], tempral_dim, 1))
 
         self.encoder = nn.Sequential(*enc_layers)
         self.decoder = nn.Sequential(*dec_layers)
+
+        self.avg_pooling = nn.AdaptiveAvgPool3d((1, None, None))
 
         self.loss_fn = F.smooth_l1_loss if smooth_l1_loss else F.mse_loss
 
@@ -286,9 +289,9 @@ class Discrete3DVAE(nn.Module):
             img.shape[-1] == image_size and img.shape[-2] == image_size
         ), f"input must have the correct image size {image_size}"
 
-        img = self.norm(img)
-
-        logits = self.encoder(img)
+        x = self.norm(img)
+        x = self.encoder(x)
+        logits = self.avg_pooling(x)
         logits = logits.squeeze(axis=2)
 
         if return_logits:
