@@ -195,7 +195,6 @@ class Discrete3DVAE(nn.Module):
                         stride=(2, 2, 2),
                         padding=(1, 1, 1),
                     ),
-                    PrintModule(),
                     activation(),
                 )
             )
@@ -318,7 +317,7 @@ class Discrete3DVAE(nn.Module):
             return out
 
         # reconstruction loss
-        img_2d, _ = torch.max(img, dim=2)
+        img_2d, _ = torch.max(img, dim=1)
 
         recon_loss = self.loss_fn(img_2d, out)
 

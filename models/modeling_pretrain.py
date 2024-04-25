@@ -281,3 +281,60 @@ def beit_base_patch16(pretrained=False, **kwargs):
         checkpoint = torch.load(kwargs["init_ckpt"], map_location="cpu")
         model.load_state_dict(checkpoint["model"])
     return model
+
+
+@register_model
+def beit_small_patch16(pretrained=False, **kwargs):
+    model = VisionTransformerForMaskedImageModeling(
+        patch_size=16,
+        embed_dim=590,
+        depth=6,
+        num_heads=6,
+        mlp_ratio=2,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs
+    )
+    model.default_cfg = _cfg()
+    if pretrained:
+        checkpoint = torch.load(kwargs["init_ckpt"], map_location="cpu")
+        model.load_state_dict(checkpoint["model"])
+    return model
+
+
+@register_model
+def beit_micro_patch16(pretrained=False, **kwargs):
+    model = VisionTransformerForMaskedImageModeling(
+        patch_size=16,
+        embed_dim=453,
+        depth=3,
+        num_heads=3,
+        mlp_ratio=2,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs
+    )
+    model.default_cfg = _cfg()
+    if pretrained:
+        checkpoint = torch.load(kwargs["init_ckpt"], map_location="cpu")
+        model.load_state_dict(checkpoint["model"])
+    return model
+
+
+@register_model
+def beit_nano_patch16(pretrained=False, **kwargs):
+    model = VisionTransformerForMaskedImageModeling(
+        patch_size=16,
+        embed_dim=348,
+        depth=1,
+        num_heads=1,
+        mlp_ratio=1,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs
+    )
+    model.default_cfg = _cfg()
+    if pretrained:
+        checkpoint = torch.load(kwargs["init_ckpt"], map_location="cpu")
+        model.load_state_dict(checkpoint["model"])
+    return model

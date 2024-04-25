@@ -1,9 +1,13 @@
 import torch
 from dalle_pytorch import DiscreteVAE
+from dalle_pytorch import Discrete3DVAE
 
 
 def get_dVAE(config, using_deepspeed=False):
-    vae = DiscreteVAE(**config.VAE_Params)
+    if config.DATASET.Heatmap_Generator.collapse_joints:
+        vae = DiscreteVAE(**config.VAE_Params)
+    else:
+        vae = Discrete3DVAE(**config.VAE_Params)
 
     if config.Pretrained_Models.discrete_vae_weight_path != "":
         state_dict = torch.load(

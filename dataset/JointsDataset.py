@@ -125,10 +125,18 @@ class JointsDataset(Dataset):
                     ),
                 ]
             else:
+                """
+                if not self.cfg.DATASET.Heatmap_Generator.collapse_joints:
+                    heatmap_data = data.max(axis=0)
+                else:
+                    heatmap_data = data
+                """
                 data = [
                     data,
                     self.masked_position_generator(
-                        heatmap=data, keypoints=kpts, is_training=self.is_training
+                        heatmap=data,
+                        keypoints=kpts,
+                        is_training=self.is_training,
                     ),
                 ]
         return data

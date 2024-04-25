@@ -160,7 +160,7 @@ def main(args):
     dVAE = dVAE.to(device)
 
     # data
-    ds = eval("dataset." + config.DATASET.test_dataset)(config, is_training=True)
+    ds = eval("dataset." + config.DATASET.train_dataset)(config, is_training=True)
 
     if distributed_utils.using_backend(distributed_utils.HorovodBackend):
         data_sampler = torch.utils.data.distributed.DistributedSampler(
@@ -176,9 +176,9 @@ def main(args):
         config.batch_size,
         shuffle=not data_sampler,
         sampler=data_sampler,
-        num_workers=8,
+        num_workers=config.num_workers,
         pin_memory=True,
-        persistent_workers=True,
+        persistent_workers=False,
     )
 
     iteration_size = len(dl)
@@ -332,7 +332,6 @@ def main(args):
     nprocs = distr_backend.get_world_size()
     print("===> The word size is {}".format(nprocs))
 
-    embed_2dpatch = config.PeIT.embed_2dpatch
     for epoch in range(start_epoch, config.epochs):
         top1 = AverageMeter()
         top5 = AverageMeter()
@@ -382,7 +381,8 @@ def main(args):
             # Collective loss, averaged
             avg_loss = distr_backend.average_all(loss)
 
-            torch.distributed.barrier()
+            if using_deepspeed:
+                torch.distributed.barrier()
 
             acc = accuracy(outputs, labels, topk=(1, 5))
 

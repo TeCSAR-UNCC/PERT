@@ -21,13 +21,13 @@
       "justMyCode": true,
       "args": [
         "--cfg",
-        "configs/PERT/PEiT_ucla_finetune_base.yaml",
+        "configs/PERT/PEiT_ntu_finetune_xsub_large.yaml",
         "--py-cfg",
         "configs/ntu2ucla/limb.py",
         "--pysk-model-weight",
         "/mnt/DATASETS_RAID_28TB/ActionsModels/ntu120_xsub_posec3d/limb.pth",
         "--peit-model-weight",
-        "/mnt/DATASETS_RAID_28TB/saved_models/current/UCLA_RUN1_PreTrained_base_Learning_Proud-Sea_15Epoch/peit_base_ucla.pth"
+        "/mnt/DATASETS_RAID_28TB/saved_models/current/NTU_RUN6_PreTrained_large_Learning_sparkling_dust_77_15Epoch/peit_large_ntu.pth"
       ],
       "env": {
         "WANDB_MODE": "offline",

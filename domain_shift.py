@@ -14,7 +14,7 @@ import dataset
 from timm.models import create_model
 from utils.args_handler import get_parsser_fintuned
 from tqdm import tqdm
-from pyskl.models.cnns import ResNet3dSlowOnly
+from pyskl.models.cnns import ResNet3dSlowOnly, ResNet
 
 
 def parse_args():
@@ -62,22 +62,31 @@ def get_model(args):
 
 
 def main(args):
-    test = ResNet3dSlowOnly(
-        in_channels=17,
-        base_channels=32,
-        num_stages=3,
-        out_indices=(2,),
-        stage_blocks=(4, 6, 3),
-        conv1_stride=(1, 1),
-        pool1_stride=(1, 1),
-        inflate=(0, 1, 1),
-        spatial_strides=(2, 2, 2),
-        temporal_strides=(1, 1, 2),
-    )
-    data = torch.rand((1, 17, 48, 256, 256))
+    m_3d = False
+    if m_3d:
+        test = ResNet3dSlowOnly(
+            in_channels=17,
+            base_channels=32,
+            num_stages=3,
+            out_indices=(2,),
+            stage_blocks=(1, 1, 1),
+            conv1_stride=(1, 1),
+            pool1_stride=(1, 1),
+            inflate=(0, 1, 1),
+            spatial_strides=(2, 2, 2),
+            temporal_strides=(2, 2, 2),
+        )
+        data = torch.rand((1, 17, 48, 256, 256))
+    else:
+        test = ResNet(
+            in_channels=48,
+            num_stages=3,
+            out_indices=(2,),
+            strides=(1, 2, 2),
+        )
+        data = torch.rand((1, 48, 256, 256))
+
     r = test(data)
-    pooling = torch.nn.AdaptiveMaxPool3d((1, 16, 16))
-    t = pooling(r)
     cfg = Config.fromfile(args.py_cfg)
     ds = build_dataset(cfg.data.val)
     model = build_model(cfg.model)

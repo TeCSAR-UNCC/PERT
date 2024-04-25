@@ -49,6 +49,7 @@ import models
 
 from utils.axu import fill_the_model_transformer, AverageMeter, reduce_mean
 from torch.utils.data.distributed import DistributedSampler
+from pyskl.models.cnns import ResNet3dSlowOnly
 
 
 def get_model(args):

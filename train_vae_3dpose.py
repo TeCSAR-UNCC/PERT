@@ -74,12 +74,12 @@ else:
 
 dl_train = DataLoader(
     ds,
-    1,  # config.batch_size,
+    config.batch_size,
     shuffle=data_sampler is None,
     sampler=data_sampler,
-    num_workers=0,  # config.num_workers,
+    num_workers=config.num_workers,
     pin_memory=True,
-    persistent_workers=False,  # (config.num_workers > 0),
+    persistent_workers=(config.num_workers > 0),
 )
 
 vae = Discrete3DVAE(**config.VAE_Params)
@@ -302,7 +302,7 @@ for epoch in range(config.epochs):
                         (heatmaps, recons, hard_recons),
                     )
                 """
-                collapsed_heatmap = heatmaps.numpy().max(axis=2).astype("float32")
+                collapsed_heatmap = heatmaps.numpy().max(axis=1).astype("float32")
                 recons_heatmap = recons.numpy().astype("float32")
                 heatmaps_rgb = convert_to_rgb_3d(collapsed_heatmap)
                 recons_rgb = convert_to_rgb_3d(recons_heatmap)

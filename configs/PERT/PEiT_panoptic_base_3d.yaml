@@ -1,25 +1,22 @@
 # Training settings
-epochs: 20
-#Not used for `triangular2` and `WarmUpCosineLR` cyclic!
+epochs: 50
+#Not used for `triangular2` cyclic!
 lr_decay: 0.99
-base_learning_rate: 1.0e-6
-max_learning_rate: 3.0e-4
-gradient_clipping: 1
+anneal_rate: 0.000001 # Temperature annealing rate
+base_learning_rate: 1.0e-8
+max_learning_rate: 1.5e-4
 coeff_step_size_up: 1
-coeff_step_size_down: 19
-weight_decay: 1.0e-1 # Learning rate decay
-anneal_rate: 5.0e-8 # Temperature annealing rate
+coeff_step_size_down: 49
+weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.46165 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
-batch_size: &bts 24
+batch_size: &bts 12
 device: 'cuda'
 world_size: 3
-num_workers: *bts
-second_heatmap: false
-kl_div_loss_weight_anneal_rate: 1.0e-2 # Temperature annealing rate
-zero_kl_div_loss_weight_at: 1.0e-7
-starting_kl_weight: 0
+num_workers: 8
+gradient_clipping: 3
+fp16_training: True
 wandb_log_dir: '/mnt/DATASETS_RAID_28TB/WAND_B/current/'
 
 #NOTE: Not sure what it is.
@@ -36,14 +33,14 @@ DATASET:
   root: '/mnt/DATASETS_RAID_28TB/panoptic-toolbox/data/'
   window_size: &dws 48 # Dataset Window Size
   frame_interval: 1
-  stride: 90
+  stride: 30
   joint_number: &jn 17
   joint_req: 0.9
   test_subset: 'validation'
   train_subset: 'train'
   camera_num: 10
   #"d_vae", "peit" or "fine-tuning"
-  training_mode: 'd_vae'
+  training_mode: 'peit'
   resolution: [1920, 1080]
   drop_frames_rate: 0.3
   # Some of the NTU video have just around 1 second.
@@ -71,7 +68,20 @@ VAE_Params:
   smooth_l1_loss: true
   normalization: null
   use_SiLU: True
-  
 
-Resume:
-  chk_ptn: ''
+Pretrained_Models:
+    discrete_vae_weight_path: '/mnt/DATASETS_RAID_28TB/saved_models/vae_48_panoptic_jumping-durian-23.pt'
+    prefix_saved_file: ''
+
+PeIT:
+  model: 'beit_base_patch16'
+  finetune_checkpoint: ''
+  checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
+  custom_run_name: 'RUN1_3DdVAE_HEATMAP_BASE_3DResBlock'
+  embed_2dpatch: *cj
+  window_size:
+    - 0
+    - 0
+  num_mask_patches: 0.4
+  max_mask_patches_per_block: 0.4
+  min_mask_patches_per_block: 0.2

@@ -11,10 +11,10 @@ weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.46165 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
-batch_size: &bts 24
+batch_size: &bts 48
 device: 'cuda'
 world_size: 3
-num_workers: *bts
+num_workers: 16
 gradient_clipping: 3
 fp16_training: True
 wandb_log_dir: '/mnt/DATASETS_RAID_28TB/WAND_B/current/'
@@ -45,7 +45,7 @@ DATASET:
   # Some of the NTU video have just around 1 second.
   max_num_frame_rate: 0.9
   linear_interpolate: False
-  second_heatmap: true
+  second_heatmap: false
   joint_number: &jn 17
 
   # Heatmap Generator
@@ -55,7 +55,7 @@ DATASET:
     with_kp: false
     heatmap_size: &hms 256 # Heatmap Size
     scaling: 1.0
-    collapse_joints: &cj false
+    collapse_joints: &cj true
 
 # Model Settings
 VAE_Params:
@@ -78,7 +78,7 @@ PeIT:
   model: 'beit_base_patch16'
   finetune_checkpoint: ''
   checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
-  custom_run_name: 'RUN1_3D_HEATMAP_BASE'
+  custom_run_name: 'RUN1_HEATMAP_ResBlock_BASE'
   embed_2dpatch: *cj
   window_size:
     - 0

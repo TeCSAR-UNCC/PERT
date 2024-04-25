@@ -17,6 +17,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from timm.models.layers import drop_path, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
+from pyskl.models.cnns import ResNet3dSlowOnly, ResNet
 
 
 def _cfg(url="", **kwargs):
@@ -280,54 +281,48 @@ class PatchEmbed(nn.Module):
         self.num_patches = num_patches
         self.embed_2dpatch = embed_2dpatch
 
-        if single_cnn:
-            if not self.embed_2dpatch:
-                print("--> Creating the 3D Patch Embeding Layer...")
+        if not self.embed_2dpatch:
+            print("--> Creating the 3D ResBlock Patch Embeding Layer...")
 
-                self.proj = nn.Sequential(
-                    nn.Conv3d(
-                        in_chans,
-                        embed_dim,
-                        kernel_size=(4, patch_size[1], patch_size[1]),
-                        stride=(1, patch_size[1], patch_size[1]),
-                    ),
-                    nn.BatchNorm3d(embed_dim),
-                    nn.AdaptiveMaxPool3d((1, patch_size[1], patch_size[1])),
-                )
-            else:
-                self.proj = nn.Conv2d(
-                    in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
-                )
+            num_stages = 3
+            base_channels = 32
+            resblock_3d_ochan = base_channels * (2 ** (num_stages + 1))
 
+            self.proj = nn.Sequential(
+                ResNet3dSlowOnly(
+                    in_channels=in_chans,
+                    base_channels=base_channels,
+                    num_stages=num_stages,
+                    out_indices=(2,),
+                    stage_blocks=(4, 6, 3),
+                    conv1_stride=(1, 1),
+                    pool1_stride=(1, 1),
+                    inflate=(0, 1, 1),
+                    spatial_strides=(2, 2, 2),
+                    temporal_strides=(1, 1, 2),
+                ),
+                nn.Conv3d(
+                    resblock_3d_ochan,
+                    embed_dim,
+                    kernel_size=1,
+                ),
+                nn.AdaptiveAvgPool3d((1, patch_size[1], patch_size[1])),
+            )
         else:
-            print("--> Creating the Embeding Layer...")
-            from math import log2
+            print("--> Creating the ResBlock Patch Embeding Layer...")
+            self.proj = nn.Sequential(
+                ResNet(
+                    in_channels=48,
+                    num_stages=3,
+                    out_indices=(2,),
+                    strides=(1, 2, 2),
+                ),
+                nn.Conv2d(1024, embed_dim, kernel_size=1),
+            )
 
-            num_layers = int(log2(img_size[0] / patch_size[0]))
-            prj_chans = [hidden_dim] * num_layers
-
-            proj_chans = [in_chans, *prj_chans]
-
-            enc_chans_io = list(zip(proj_chans[:-1], proj_chans[1:]))
-
-            proj_layers = []
-
-            conve_layer = nn.Conv3d if embed_2dpatch else nn.Conv2d
-
-            for proj_in, proj_out in enc_chans_io:
-                proj_layers.append(
-                    nn.Sequential(
-                        conve_layer(proj_in, proj_out, 4, stride=2, padding=1),
-                        activation(),
-                    )
-                )
-
-            proj_layers.append(conve_layer(proj_chans[-1], embed_dim, 1))
-            if self.embed_2dpatch:
-                proj_layers.append(
-                    nn.AdaptiveAvgPool3d((1, num_patches, self.num_patches))
-                )
-            self.proj = nn.Sequential(*proj_layers)
+            # self.proj = nn.Conv2d(
+            #    in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
+            # )
 
     def forward(self, x, **kwargs):
         if not self.embed_2dpatch:
@@ -712,6 +707,28 @@ def beit_large_patch16_512(pretrained=False, **kwargs):
         depth=24,
         num_heads=16,
         mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs,
+    )
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def beit_nano_patch16_224(pretrained=False, **kwargs):
+    if "pretrained_cfg" in kwargs:
+        kwargs.pop("pretrained_cfg")
+
+    if "pretrained_cfg_overlay" in kwargs:
+        kwargs.pop("pretrained_cfg_overlay")
+
+    model = VisionTransformer(
+        patch_size=16,
+        embed_dim=348,
+        depth=1,
+        num_heads=1,
+        mlp_ratio=1,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs,

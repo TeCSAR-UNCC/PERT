@@ -4,6 +4,9 @@ from .modeling_pretrain import (
     beit_base_patch8_224_8k_vocab,
     beit_base_patch16,
     beit_large_patch16,
+    beit_nano_patch16,
+    beit_micro_patch16,
+    beit_small_patch16,
 )
 
 from .modeling_finetune import (
