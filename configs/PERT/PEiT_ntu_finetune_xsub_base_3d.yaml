@@ -1,20 +1,21 @@
 
+# Training settings
 epochs: 25
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
-base_learning_rate: 1.0e-6
+base_learning_rate: 1.0e-8
 max_learning_rate: 1.0e-4
-coeff_step_size_up: 1
-coeff_step_size_down: 24
+coeff_step_size_up: 2
+coeff_step_size_down: 23
 weight_decay: 0.0003
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
-batch_size: &bs 16
+batch_size: &bs 8
 device: 'cuda'
 world_size: 2
-num_workers: *bs
+num_workers: 4
 repeated_size_of_dataset: 10
 
 #NOTE: Not sure what it is.
@@ -28,8 +29,9 @@ DATASET:
   train_dataset: 'ntu_mmcv'
   test_dataset: 'ntu_mmcv'
   window_size: &dws 48 # Dataset Window Size
-  second_heatmap: false
+  second_heatmap: &dVAE_heatmap_size null
   num_classes: 120
+  joint_number: &jn 17
   mmcv_config: 'configs/nturgbd/ntu120_limb_xsub.py'
 
   Heatmap_Generator:
@@ -40,14 +42,14 @@ DATASET:
 
 Pretrained_Models:
   discrete_vae_weight_path: ''
-  pretrain_saved_file: '/mnt/DATASETS_RAID_28TB/saved_models/current/Pre_large_RUN1_dVAE_divine-gorge_4_W64_50Epoch/beit_best_silvery-universe-1_pretraining.pt'
+  pretrain_saved_file: '/mnt/DATASETS_RAID_28TB/saved_models/current/RUN1_3DdVAE_HEATMAP_BASE_3DResBlock/beit_best_gentle-serenity-17_pretraining.pt'
 
 
 PeIT:
-  model: 'beit_large_patch16_224'
+  model: 'beit_base_patch16_224'
   finetune_checkpoint: ''
-  checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current/'
-  custom_run_name: 'NTU_RUN1_PreTrained_large_Learning_silvery_universe_1_25Epoch_WS64'
+  checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
+  custom_run_name: 'NTU_RUN1_PreTrained_base_23_3dResBlock'
   embed_2dpatch: *cj
   window_size:
     - 0

@@ -93,7 +93,7 @@ def main():
     color_palette = create_distinct_color_palette(J)
     draw_pose_skeleton(combined_heatmaps[0], color_palette, filename="pant")
 
-    if not config.DATASET.Heatmap_Generator.collapse_joints:
+    if not config.DATASET.Heatmap_Generator.joint_reduction:
         video_heatmaps = combined_heatmaps.max(axis=1)
 
     video_name = "heatmap_video.mp4"

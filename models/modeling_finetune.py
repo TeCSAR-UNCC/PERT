@@ -427,6 +427,7 @@ class VisionTransformer(nn.Module):
         use_shared_rel_pos_bias=False,
         use_mean_pooling=True,
         init_scale=0.001,
+        embed_2dpatch=True,
     ):
         super().__init__()
         self.num_classes = num_classes
@@ -439,6 +440,7 @@ class VisionTransformer(nn.Module):
             patch_size=patch_size,
             in_chans=in_chans,
             embed_dim=embed_dim,
+            embed_2dpatch=embed_2dpatch,
         )
         num_patches = self.patch_embed.num_patches
 

@@ -126,7 +126,7 @@ class JointsDataset(Dataset):
                 ]
             else:
                 """
-                if not self.cfg.DATASET.Heatmap_Generator.collapse_joints:
+                if not self.cfg.DATASET.Heatmap_Generator.joint_reduction:
                     heatmap_data = data.max(axis=0)
                 else:
                     heatmap_data = data

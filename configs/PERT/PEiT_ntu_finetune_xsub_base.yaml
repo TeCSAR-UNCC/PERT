@@ -8,7 +8,7 @@ base_learning_rate: 1.0e-8
 max_learning_rate: 1.0e-4
 coeff_step_size_up: 1
 coeff_step_size_down: 24
-weight_decay: 0.05
+weight_decay: 0.0003
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
@@ -36,19 +36,20 @@ DATASET:
   Heatmap_Generator:
     # You need to also update `mmcv_config` if you change this value to something else.
     heatmap_size: 256
+    joint_reduction: &cj true
 
 
 Pretrained_Models:
   discrete_vae_weight_path: ''
-  pretrain_saved_file: '/mnt/DATASETS_RAID_28TB/saved_models/current/Pre_base_RUN2_dVAE_sparkling_dust_77_50Epoch/beit_best_proud-sea-6_finetuning.pt'
+  pretrain_saved_file: '/mnt/DATASETS_RAID_28TB/saved_models/current/RUN1_HEATMAP_ResBlock_BASE/beit_best_peach-lake-23_pretraining.pt'
 
 
 PeIT:
   model: 'beit_base_patch16_224'
-  finetune_checkpoint: '/mnt/DATASETS_RAID_28TB/saved_models/current/NTU_RUN6_PreTrained_base_Learning_Proud-Sea_15Epoch'
+  finetune_checkpoint: '/mnt/DATASETS_RAID_28TB/saved_models/current/NTU_RUN1_PreTrained_base_Learning_peach_lake_23_ResBlock'
   checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
-  custom_run_name: 'NTU_RUN7_PreTrained_base_Learning_Proud-Sea_15Epoch'
-  patch_3d: true
+  custom_run_name: 'NTU_RUN2_PreTrained_base_Learning_peach_lake_23_ResBlock'
+  embed_2dpatch: *cj
   window_size:
     - 0
     - 0

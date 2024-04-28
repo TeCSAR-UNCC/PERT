@@ -357,7 +357,7 @@ def fill_the_model(model, args):
 
     if args.config.Pretrained_Models.pretrain_saved_file == "":
         print("XX> Pretrained model not found.")
-        return
+        return False
 
     checkpoint = torch.load(
         args.config.Pretrained_Models.pretrain_saved_file, map_location="cpu"
@@ -502,6 +502,7 @@ def fill_the_model(model, args):
             checkpoint_model["pos_embed"] = new_pos_embed
 
     load_state_dict(model, checkpoint_model, prefix=args.model_prefix)
+    return True
 
 
 def fill_the_model_transformer(model, args):

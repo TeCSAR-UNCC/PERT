@@ -52,7 +52,11 @@ def get_model(args):
     model = create_model(
         args.model,
         img_size=config.DATASET.Heatmap_Generator.heatmap_size,
-        in_chans=config.DATASET.window_size,
+        in_chans=(
+            config.DATASET.window_size
+            if config.DATASET.Heatmap_Generator.joint_reduction
+            else config.DATASET.joint_number
+        ),
         num_classes=config.DATASET.num_classes,
         pretrained=False,
         drop_path_rate=args.drop_path,
@@ -60,6 +64,7 @@ def get_model(args):
         use_shared_rel_pos_bias=args.rel_pos_bias,
         use_abs_pos_emb=args.abs_pos_emb,
         init_values=args.layer_scale_init_value,
+        embed_2dpatch=config.PeIT.embed_2dpatch,
     )
 
     return model
@@ -124,6 +129,8 @@ def validate(model_engin, dl_validation, device, using_deepspeed, nprocs):
 
 
 def main(args):
+    debug = False
+
     init_distributed_mode(args)
 
     print(args)
@@ -142,7 +149,7 @@ def main(args):
     cudnn.benchmark = True
 
     model = get_model(args)
-    fill_the_model(model, args)
+    filled = fill_the_model(model, args)
     patch_size = model.patch_embed.patch_size
     print("Patch size = %s" % str(patch_size))
     config.PeIT.window_size = (
@@ -177,12 +184,12 @@ def main(args):
 
     dl_train = DataLoader(
         ds_train,
-        config.batch_size,
+        1 if debug else config.batch_size,
         shuffle=data_sampler is None,
         sampler=data_sampler,
-        num_workers=config.num_workers,
+        num_workers=0 if debug else config.num_workers,
         pin_memory=True,
-        persistent_workers=(config.num_workers > 0),
+        persistent_workers=False if debug else (config.num_workers > 0),
     )
 
     nprocs = distr_backend.get_world_size()
@@ -327,7 +334,7 @@ def main(args):
             name=args.model,
             img_size=config.DATASET.Heatmap_Generator.heatmap_size,
             in_chans=config.DATASET.window_size,
-            pretrained=False,
+            pretrained=filled,
             drop_path_rate=args.drop_path,
             drop_block_rate=None,
             use_shared_rel_pos_bias=args.rel_pos_bias,
@@ -454,7 +461,7 @@ def main(args):
                         dist_model,
                         distr_backend,
                         model,
-                        epoch=epoch + 1,
+                        epoch=epoch,
                         top1_val=acc_val[0],
                     )
                     val_top1 = acc_val[0]

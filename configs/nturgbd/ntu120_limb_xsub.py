@@ -44,7 +44,7 @@ left_limb = [0, 2, 3, 6, 7, 8, 12, 14]
 right_limb = [1, 4, 5, 9, 10, 11, 13, 15]
 class_prob = [1] * 60 + [2] * 60
 train_pipeline = [
-    dict(type="UniformSampleFrames", clip_len=64),
+    dict(type="UniformSampleFrames", clip_len=48),
     dict(type="PoseDecode"),
     dict(type="PoseCompact", hw_ratio=1.0, allow_imgpad=True),
     dict(type="Resize", scale=(-1, 64)),
@@ -58,7 +58,7 @@ train_pipeline = [
     dict(type="ToTensor", keys=["imgs", "label"]),
 ]
 val_pipeline = [
-    dict(type="UniformSampleFrames", clip_len=64, num_clips=1),
+    dict(type="UniformSampleFrames", clip_len=48, num_clips=1),
     dict(type="PoseDecode"),
     dict(type="PoseCompact", hw_ratio=1.0, allow_imgpad=True),
     dict(type="Resize", scale=(256, 256), keep_ratio=False),
@@ -68,7 +68,7 @@ val_pipeline = [
     dict(type="ToTensor", keys=["imgs"]),
 ]
 test_pipeline = [
-    dict(type="UniformSampleFrames", clip_len=64, num_clips=10),
+    dict(type="UniformSampleFrames", clip_len=48, num_clips=10),
     dict(type="PoseDecode"),
     dict(type="PoseCompact", hw_ratio=1.0, allow_imgpad=True),
     dict(type="Resize", scale=(256, 256), keep_ratio=False),

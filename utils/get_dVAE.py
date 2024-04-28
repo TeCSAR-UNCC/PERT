@@ -4,7 +4,7 @@ from dalle_pytorch import Discrete3DVAE
 
 
 def get_dVAE(config, using_deepspeed=False):
-    if config.DATASET.Heatmap_Generator.collapse_joints:
+    if config.DATASET.Heatmap_Generator.joint_reduction:
         vae = DiscreteVAE(**config.VAE_Params)
     else:
         vae = Discrete3DVAE(**config.VAE_Params)

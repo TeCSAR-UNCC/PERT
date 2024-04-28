@@ -54,7 +54,7 @@ DATASET:
     with_kp: false
     heatmap_size: &hms 256 # Heatmap Size
     scaling: 1.0
-    collapse_joints: &cj false
+    joint_reduction: &cj false
 
 # Model Settings
 VAE_Params:
