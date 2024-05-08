@@ -7,6 +7,7 @@ from .modeling_pretrain import (
     beit_nano_patch16,
     beit_micro_patch16,
     beit_small_patch16,
+    beit_base_8k,
 )
 
 from .modeling_finetune import (
@@ -14,6 +15,7 @@ from .modeling_finetune import (
     beit_base_patch16_384,
     beit_large_patch8_224,
     beit_base_patch8_224,
+    beit_base,
 )
 
 from .modeling_pretrain_token_input import (

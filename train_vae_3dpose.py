@@ -65,6 +65,8 @@ ds = eval("dataset." + config.DATASET.train_dataset)(config, is_training=True)
 
 device = torch.device(config.device)
 
+debug = False
+
 if distributed_utils.using_backend(distributed_utils.HorovodBackend):
     data_sampler = torch.utils.data.distributed.DistributedSampler(
         ds, num_replicas=distr_backend.get_world_size(), rank=distr_backend.get_rank()
@@ -74,15 +76,16 @@ else:
 
 dl_train = DataLoader(
     ds,
-    config.batch_size,
+    1 if debug else config.batch_size,
     shuffle=data_sampler is None,
     sampler=data_sampler,
-    num_workers=config.num_workers,
+    num_workers=0 if debug else config.num_workers,
     pin_memory=True,
-    persistent_workers=(config.num_workers > 0),
+    persistent_workers=False if debug else (config.num_workers > 0),
 )
 
 vae = Discrete3DVAE(**config.VAE_Params)
+d3d_encoder = config.VAE_Params.d3d_decoder
 
 resume = False
 if config.Resume.chk_ptn != "":
@@ -304,6 +307,8 @@ for epoch in range(config.epochs):
                 """
                 collapsed_heatmap = heatmaps.numpy().max(axis=1).astype("float32")
                 recons_heatmap = recons.numpy().astype("float32")
+                if d3d_encoder:
+                    recons_heatmap = recons_heatmap.max(axis=2)
                 heatmaps_rgb = convert_to_rgb_3d(collapsed_heatmap)
                 recons_rgb = convert_to_rgb_3d(recons_heatmap)
                 # hard_recons_rgb = convert_to_rgb_3d(hard_recons.numpy())

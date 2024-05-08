@@ -1,1 +1,1 @@
-deepspeed --master_port 12343 --include localhost:0,2 finetune_peit.py --cfg configs/PERT/PEiT_ntu_finetune_xsub_base_3d.yaml
+deepspeed --master_port 12347 --include localhost:1 finetune_peit.py --cfg configs/PERT/PEiT_ntu_finetune_xsub_base_3d.yaml

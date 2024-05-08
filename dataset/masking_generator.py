@@ -298,14 +298,14 @@ class MaskingGenerator:
                     mask_count += delta
             return mask
 
-        S = heatmap.shape[1] // self.height
+        S = heatmap.shape[-1] // self.height
         # mask = mask_random_squares(
         #    heatmap, S, self.num_masking_patches, self.max_num_patches
         # )
         mask = generate_mask_from_points(
             keypoints,
-            heatmap.shape[2],
-            heatmap.shape[1],
+            heatmap.shape[-2],
+            heatmap.shape[-1],
             S,
             self.num_masking_patches,
             self.max_num_patches,

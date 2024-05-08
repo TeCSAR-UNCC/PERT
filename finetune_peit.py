@@ -59,12 +59,14 @@ def get_model(args):
         ),
         num_classes=config.DATASET.num_classes,
         pretrained=False,
-        drop_path_rate=args.drop_path,
-        drop_block_rate=None,
         use_shared_rel_pos_bias=args.rel_pos_bias,
         use_abs_pos_emb=args.abs_pos_emb,
         init_values=args.layer_scale_init_value,
         embed_2dpatch=config.PeIT.embed_2dpatch,
+        patch_size=config.PeIT.patch_size,
+        drop_rate=config.PeIT.drop_rate,
+        attn_drop_rate=config.PeIT.attn_drop_rate,
+        drop_path_rate=config.PeIT.drop_path_rate,
     )
 
     return model
@@ -115,6 +117,9 @@ def validate(model_engin, dl_validation, device, using_deepspeed, nprocs):
                 outputs = model_engin(data)
 
             acc = accuracy(outputs, target, topk=(1, 5))
+
+            torch.distributed.barrier()
+
             if using_deepspeed:
                 reduced_acc1 = reduce_mean(acc[0], nprocs)
                 reduced_acc5 = reduce_mean(acc[1], nprocs)
@@ -374,7 +379,9 @@ def main(args):
 
             with torch.cuda.amp.autocast():
                 outputs = model(heatmaps)
-                loss = nn.CrossEntropyLoss()(input=outputs, target=labels)
+                loss = nn.CrossEntropyLoss(label_smoothing=0.1)(
+                    input=outputs, target=labels
+                )
 
             if using_deepspeed:
                 # Gradients are automatically zeroed after the step

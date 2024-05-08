@@ -18,6 +18,7 @@ import torch.nn.functional as F
 from timm.models.layers import drop_path, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
 from pyskl.models.cnns import ResNet3dSlowOnly, ResNet
+from dalle_pytorch.dalle_pytorch_3d import PrintModule
 
 
 def _cfg(url="", **kwargs):
@@ -298,18 +299,19 @@ class PatchEmbed(nn.Module):
                     conv1_stride=(1, 1),
                     pool1_stride=(1, 1),
                     inflate=(0, 1, 1),
-                    spatial_strides=(2, 2, 2),
-                    temporal_strides=(1, 1, 2),
+                    spatial_strides=(1, 2, 2),
+                    temporal_strides=(2, 2, 2),
                 ),
                 nn.Conv3d(
                     resblock_3d_ochan,
                     embed_dim,
                     kernel_size=1,
                 ),
-                nn.AdaptiveAvgPool3d((1, patch_size[1], patch_size[1])),
+                nn.AdaptiveAvgPool3d((1, self.patch_shape[1], self.patch_shape[1])),
             )
         else:
-            print("--> Creating the ResBlock Patch Embeding Layer...")
+            print("--> Creating the 2D Patch Embeding Layer...")
+
             self.proj = nn.Sequential(
                 ResNet(
                     in_channels=48,
@@ -319,10 +321,12 @@ class PatchEmbed(nn.Module):
                 ),
                 nn.Conv2d(1024, embed_dim, kernel_size=1),
             )
+            """
 
-            # self.proj = nn.Conv2d(
-            #    in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
-            # )
+            self.proj = nn.Conv2d(
+                in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
+            )
+            """
 
     def forward(self, x, **kwargs):
         if not self.embed_2dpatch:
@@ -594,6 +598,27 @@ def beit_base_patch16_224(pretrained=False, **kwargs):
 
     model = VisionTransformer(
         patch_size=16,
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs,
+    )
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
+def beit_base(pretrained=False, **kwargs):
+    if "pretrained_cfg" in kwargs:
+        kwargs.pop("pretrained_cfg")
+
+    if "pretrained_cfg_overlay" in kwargs:
+        kwargs.pop("pretrained_cfg_overlay")
+
+    model = VisionTransformer(
         embed_dim=768,
         depth=12,
         num_heads=12,

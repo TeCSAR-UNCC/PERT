@@ -283,7 +283,7 @@ class GeneratePoseTarget:
 
     def __init__(
         self,
-        sigma=1.0,
+        sigma=0.6,
         use_score=False,
         use_gaussian_score=False,
         mean_gaussian_score=0.85,

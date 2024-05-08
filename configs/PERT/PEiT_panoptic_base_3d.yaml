@@ -11,9 +11,9 @@ weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.46165 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
-batch_size: &bts 12
+batch_size: &bts 32
 device: 'cuda'
-world_size: 3
+world_size: 1
 num_workers: 8
 gradient_clipping: 3
 fp16_training: True
@@ -52,14 +52,14 @@ DATASET:
     use_gaussian_score: false
     with_limb: true
     with_kp: false
-    heatmap_size: &hms 256 # Heatmap Size
+    heatmap_size: &hms 72 # Heatmap Size
     scaling: 1.0
     joint_reduction: &cj false
 
 # Model Settings
 VAE_Params:
   image_size: *hms
-  num_layers: 4 # Number of layers (should be 3 or above)
+  num_layers: 2 # Number of layers (should be 3 or above)
   num_tokens: 8096 # Number of image tokens
   codebook_dim: 512
   hidden_dim: 256
@@ -68,17 +68,20 @@ VAE_Params:
   smooth_l1_loss: true
   normalization: null
   use_SiLU: True
+  d3d_decoder: false
 
 Pretrained_Models:
-    discrete_vae_weight_path: '/mnt/DATASETS_RAID_28TB/saved_models/vae_48_panoptic_jumping-durian-23.pt'
+    discrete_vae_weight_path: './saved_models/vae_48_panoptic_super-serenity-1.pt'
     prefix_saved_file: ''
 
 PeIT:
-  model: 'beit_base_patch16'
+  model: 'beit_base_8k'
   finetune_checkpoint: ''
   checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
-  custom_run_name: 'RUN1_3DdVAE_HEATMAP_BASE_3DResBlock'
+  custom_run_name: 'RUN1_3DdVAE_HEATMAP_BASE_3DResBlock_Super_Serenity'
   embed_2dpatch: *cj
+  # Patch size in pixel
+  patch_size: 4
   window_size:
     - 0
     - 0

@@ -186,6 +186,27 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
 
 
 @register_model
+def beit_base_8k(pretrained=False, **kwargs):
+    if "pretrained_cfg" in kwargs:
+        kwargs.pop("pretrained_cfg")
+
+    if "pretrained_cfg_overlay" in kwargs:
+        kwargs.pop("pretrained_cfg_overlay")
+
+    model = VisionTransformerForMaskedImageModeling(
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        mlp_ratio=4,
+        qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        **kwargs,
+    )
+    model.default_cfg = _cfg()
+    return model
+
+
+@register_model
 def beit_base_patch16_224_8k_vocab(pretrained=False, **kwargs):
     model = VisionTransformerForMaskedImageModeling(
         patch_size=16,
@@ -196,7 +217,7 @@ def beit_base_patch16_224_8k_vocab(pretrained=False, **kwargs):
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         vocab_size=8192,
-        **kwargs
+        **kwargs,
     )
     model.default_cfg = _cfg()
     if pretrained:
@@ -216,7 +237,7 @@ def beit_base_patch8_224_8k_vocab(pretrained=False, **kwargs):
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         vocab_size=8192,
-        **kwargs
+        **kwargs,
     )
     model.default_cfg = _cfg()
     if pretrained:
@@ -236,7 +257,7 @@ def beit_large_patch16_224_8k_vocab(pretrained=False, **kwargs):
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         vocab_size=8192,
-        **kwargs
+        **kwargs,
     )
     model.default_cfg = _cfg()
     if pretrained:
@@ -255,7 +276,7 @@ def beit_large_patch16(pretrained=False, **kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs
+        **kwargs,
     )
     model.default_cfg = _cfg()
     if pretrained:
@@ -274,7 +295,7 @@ def beit_base_patch16(pretrained=False, **kwargs):
         mlp_ratio=4,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs
+        **kwargs,
     )
     model.default_cfg = _cfg()
     if pretrained:
@@ -293,7 +314,7 @@ def beit_small_patch16(pretrained=False, **kwargs):
         mlp_ratio=2,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs
+        **kwargs,
     )
     model.default_cfg = _cfg()
     if pretrained:
@@ -312,7 +333,7 @@ def beit_micro_patch16(pretrained=False, **kwargs):
         mlp_ratio=2,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs
+        **kwargs,
     )
     model.default_cfg = _cfg()
     if pretrained:
@@ -331,7 +352,7 @@ def beit_nano_patch16(pretrained=False, **kwargs):
         mlp_ratio=1,
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
-        **kwargs
+        **kwargs,
     )
     model.default_cfg = _cfg()
     if pretrained:

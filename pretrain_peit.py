@@ -77,6 +77,7 @@ def get_model(args):
         vocab_size=config.VAE_Params.num_tokens,
         single_cnn=not (args.disable_single_cnn),
         embed_2dpatch=config.PeIT.embed_2dpatch,
+        patch_size=config.PeIT.patch_size,
     )
 
     # Do we have a checkpoint to start from?
@@ -122,6 +123,12 @@ def save_model(
 
 
 def main(args):
+
+    debug = False
+
+    if debug:
+        print("X---> Debug mode is activated <---X")
+
     init_distributed_mode(args)
 
     print(args)
@@ -173,12 +180,12 @@ def main(args):
 
     dl = DataLoader(
         ds,
-        config.batch_size,
+        1 if debug else config.batch_size,
         shuffle=not data_sampler,
         sampler=data_sampler,
-        num_workers=config.num_workers,
+        num_workers=0 if debug else config.num_workers,
         pin_memory=True,
-        persistent_workers=False,
+        persistent_workers=False if debug else (config.num_workers > 0),
     )
 
     iteration_size = len(dl)

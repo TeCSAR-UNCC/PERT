@@ -55,14 +55,14 @@ DATASET:
     use_gaussian_score: false
     with_limb: true
     with_kp: false
-    heatmap_size: &hms 256 # Heatmap Size
+    heatmap_size: &hms 72 # Heatmap Size
     scaling: 1.0
     joint_reduction: &cj false
 
 # Model Settings
 VAE_Params:
   image_size: *hms
-  num_layers: 4 # Number of layers (should be 3 or above)
+  num_layers: 2 # Number of layers (should be 3 or above)
   num_tokens: 8096 # Number of image tokens
   codebook_dim: 512
   hidden_dim: 256
@@ -71,6 +71,7 @@ VAE_Params:
   smooth_l1_loss: true
   normalization: null
   use_SiLU: True
+  d3d_decoder: false
   
 
 Resume:
