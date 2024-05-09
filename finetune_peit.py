@@ -349,8 +349,8 @@ def main(args):
         )
 
         run = wandb.init(
-            project="BEiT_{}_Fine_Tunning_{}".format(
-                config.DATASET.train_dataset, args.model
+            project="BEiT_{}_{}_Fine_Tunning_{}".format(
+                config.DATASET.train_dataset, config.extra_project_name, args.model
             ),
             job_type="training",
             config=model_config,

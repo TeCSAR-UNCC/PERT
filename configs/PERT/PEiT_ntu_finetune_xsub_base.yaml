@@ -1,4 +1,3 @@
-
 # Training settings
 epochs: 50
 #Not used for `triangular2` cyclic!
@@ -12,47 +11,46 @@ weight_decay: 0.0003
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
-batch_size: &bs 32
-device: 'cuda'
-world_size: 2
-num_workers: 8
+batch_size: &bs 8
+device: "cuda"
+world_size: 1
+num_workers: 4
 repeated_size_of_dataset: 10
+extra_project_name: "sub120_2d"
 
 #NOTE: Not sure what it is.
-transparent: true 
+transparent: true
 
 deepspeed: true
 distributed_backend: true
 
 # Dataset Settings
 DATASET:
-  train_dataset: 'ntu_mmcv'
-  test_dataset: 'ntu_mmcv'
+  train_dataset: "ntu_mmcv"
+  test_dataset: "ntu_mmcv"
   window_size: &dws 48 # Dataset Window Size
   second_heatmap: &dVAE_heatmap_size null
   num_classes: 120
-  mmcv_config: 'configs/nturgbd/ntu120_limb_xsub_2d.py'
+  mmcv_config: "configs/nturgbd/ntu120_limb_xsub_2d.py"
 
   Heatmap_Generator:
     # You need to also update `mmcv_config` if you change this value to something else.
     heatmap_size: 256
     joint_reduction: &cj true
 
-
 Pretrained_Models:
-  discrete_vae_weight_path: ''
-  pretrain_saved_file: '/mnt/DATASETS_RAID_28TB/saved_models/current/RUN1_HEATMAP_ResBlock_BASE/beit_best_peach-lake-23_pretraining.pt'
-
+  discrete_vae_weight_path: ""
+  pretrain_saved_file: "/mnt/DATASETS_RAID_28TB/saved_models/current/RUN1_HEATMAP_ResBlock_BASE/beit_best_peach-lake-23_pretraining.pt"
 
 PeIT:
-  model: 'beit_base'
-  finetune_checkpoint: ''
-  checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
-  custom_run_name: 'NTU_RUN1_D40_ResBlock_50Epoch_Smooth_CE'
+  model: "beit_base"
+  finetune_checkpoint: ""
+  checkpoint_root_folder: "/mnt/DATASETS_RAID_28TB/saved_models/current"
+  custom_run_name: "NTU_RUN1_D40_ResBlock_50Epoch_Smooth_CE"
   embed_2dpatch: *cj
-  drop_rate: 0.4
-  attn_drop_rate: 0.4
-  drop_path_rate: 0.4
+  drop_rate: 0.6
+  attn_drop_rate: 0.6
+  drop_path_rate: 0.6
   patch_size: 16
   window_size:
     - 0

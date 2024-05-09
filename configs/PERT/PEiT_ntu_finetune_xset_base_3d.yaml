@@ -16,7 +16,7 @@ device: "cuda"
 world_size: 1
 num_workers: 8
 repeated_size_of_dataset: 10
-extra_project_name: "sub120"
+extra_project_name: "set120"
 
 #NOTE: Not sure what it is.
 transparent: true
@@ -32,7 +32,7 @@ DATASET:
   second_heatmap: &dVAE_heatmap_size null
   num_classes: 120
   joint_number: &jn 17
-  mmcv_config: "configs/nturgbd/ntu120_limb_xsub.py"
+  mmcv_config: "configs/nturgbd/ntu120_limb_xset.py"
 
   Heatmap_Generator:
     # You need to also update `mmcv_config` if you change this value to something else.
@@ -45,13 +45,13 @@ Pretrained_Models:
 
 PeIT:
   model: "beit_base"
-  finetune_checkpoint: "/mnt/DATASETS_RAID_28TB/saved_models/current/NTU_RUN6_PreTrained_base_23_3dResBlock_firm-wood_3_W_Dropout_label_smoothing/"
+  finetune_checkpoint: ""
   checkpoint_root_folder: "/mnt/DATASETS_RAID_28TB/saved_models/current"
-  custom_run_name: "NTU_RUN7_PreTrained_base_23_3dResBlock_firm-wood_3_W_Dropout_label_smoothing_20p"
+  custom_run_name: "NTU120_SET_RUN1"
   embed_2dpatch: *cj
-  drop_rate: 0.6
-  attn_drop_rate: 0.6
-  drop_path_rate: 0.6
+  drop_rate: 0.4
+  attn_drop_rate: 0.4
+  drop_path_rate: 0.4
   patch_size: 4
   window_size:
     - 0
