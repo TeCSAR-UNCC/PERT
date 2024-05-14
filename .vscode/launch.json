@@ -87,6 +87,19 @@
       }
     },
     {
+      "name": "original_finetuning_3d_120",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "finetune_peit.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/PEiT_ntu_finetune_xset_base_3d.yaml"],
+      "env": {
+        "WANDB_MODE": "offline",
+        "CUDA_VISIBLE_DEVICES": "0"
+      }
+    },
+    {
       "name": "pre_training_pose_transformer",
       "type": "debugpy",
       "request": "launch",
