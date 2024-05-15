@@ -45,9 +45,9 @@ Pretrained_Models:
 
 PeIT:
   model: "beit_base"
-  finetune_checkpoint: "/mnt/DATASETS_RAID_28TB/saved_models/current/NTU_RUN6_PreTrained_base_23_3dResBlock_firm-wood_3_W_Dropout_label_smoothing/"
+  finetune_checkpoint: ""
   checkpoint_root_folder: "/mnt/DATASETS_RAID_28TB/saved_models/current"
-  custom_run_name: "NTU_RUN7_PreTrained_base_23_3dResBlock_firm-wood_3_W_Dropout_label_smoothing_20p"
+  custom_run_name: "NTU120_SUB_RUN1"
   embed_2dpatch: *cj
   drop_rate: 0.6
   attn_drop_rate: 0.6
