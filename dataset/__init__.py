@@ -12,6 +12,7 @@ from dataset.nturgbd import Nturgbd as nturgbd, Action_Nturgbd as action_nturgbd
 from dataset.pan_ntu import Pan_Ntu as pan_ntu
 from dataset.nturgbd_mmcv import NTU_MMCV as ntu_mmcv
 from dataset.ucla import UCLA_MMCV as ucla_mmcv
+from dataset.nturgbd_oneShot import NTU_oneShot as ntu_oneShot
 
 # from dataset.kalman_filter import KeypointsKalmanFilter
 from dataset.graph import JOINTS_DEF, JOINTS_PAIRS
