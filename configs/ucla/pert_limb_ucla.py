@@ -43,30 +43,53 @@ skeletons = [
 left_limb = [0, 2, 3, 6, 7, 8, 12, 14]
 right_limb = [1, 4, 5, 9, 10, 11, 13, 15]
 class_prob = [1] * 60 + [2] * 60
+
 train_pipeline = [
     dict(type="UniformSampleFrames", clip_len=48),
     dict(type="PoseDecode"),
     dict(type="PoseCompact", hw_ratio=1.0, allow_imgpad=True),
-    dict(type="Resize", scale=(-1, 64)),
+    dict(type="Resize", scale=(-1, 82)),
     dict(type="RandomResizedCrop", area_range=(0.56, 1.0)),
-    dict(type="Resize", scale=(256, 256), keep_ratio=False),
+    dict(type="Resize", scale=(72, 72), keep_ratio=False),
     dict(type="Flip", flip_ratio=0.5, left_kp=left_kp, right_kp=right_kp),
-    # dict(type="ExpandSlowMotion", window_size=300),
     dict(type="GeneratePoseTarget", with_kp=False, with_limb=True, skeletons=skeletons),
     dict(type="FormatShape", input_format="NCTHW_Heatmap"),
     dict(type="Collect", keys=["imgs", "label"], meta_keys=[]),
     dict(type="ToTensor", keys=["imgs", "label"]),
 ]
+
+
 val_pipeline = [
     dict(type="UniformSampleFrames", clip_len=48, num_clips=1),
     dict(type="PoseDecode"),
     dict(type="PoseCompact", hw_ratio=1.0, allow_imgpad=True),
-    dict(type="Resize", scale=(256, 256), keep_ratio=False),
+    dict(type="Resize", scale=(72, 72), keep_ratio=False),
     dict(type="GeneratePoseTarget", with_kp=False, with_limb=True, skeletons=skeletons),
     dict(type="FormatShape", input_format="NCTHW_Heatmap"),
     dict(type="Collect", keys=["imgs", "label"], meta_keys=[]),
     dict(type="ToTensor", keys=["imgs"]),
 ]
+test_pipeline = [
+    dict(type="UniformSampleFrames", clip_len=48, num_clips=10),
+    dict(type="PoseDecode"),
+    dict(type="PoseCompact", hw_ratio=1.0, allow_imgpad=True),
+    dict(type="Resize", scale=(72, 72), keep_ratio=False),
+    dict(
+        type="GeneratePoseTarget",
+        with_kp=False,
+        with_limb=True,
+        skeletons=skeletons,
+        double=True,
+        left_kp=left_kp,
+        right_kp=right_kp,
+        left_limb=left_limb,
+        right_limb=right_limb,
+    ),
+    dict(type="FormatShape", input_format="NCTHW_Heatmap"),
+    dict(type="Collect", keys=["imgs", "label"], meta_keys=[]),
+    dict(type="ToTensor", keys=["imgs"]),
+]
+
 data = dict(
     videos_per_gpu=32,
     workers_per_gpu=4,

@@ -21,17 +21,17 @@
       "justMyCode": true,
       "args": [
         "--cfg",
-        "configs/PERT/PEiT_ntu_finetune_xsub_large.yaml",
+        "configs/ntu2ucla/PEiT_ntu2ucla_finetune_xsub_base.yaml",
         "--py-cfg",
         "configs/ntu2ucla/limb.py",
         "--pysk-model-weight",
-        "/mnt/DATASETS_RAID_28TB/ActionsModels/ntu120_xsub_posec3d/limb.pth",
+        "./saved_models/slowonly_r50_ntu120_xsub_limb.pth",
         "--peit-model-weight",
-        "/mnt/DATASETS_RAID_28TB/saved_models/current/NTU_RUN6_PreTrained_large_Learning_sparkling_dust_77_15Epoch/peit_large_ntu.pth"
+        "/mnt/DATASETS_RAID_28TB/saved_models/current/NTU120_SUB_RUN2/ntu120_sub.pth"
       ],
       "env": {
         "WANDB_MODE": "offline",
-        "CUDA_VISIBLE_DEVICES": "2"
+        "CUDA_VISIBLE_DEVICES": "0"
       }
     },
     {

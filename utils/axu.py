@@ -8,6 +8,18 @@ import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
 from collections import OrderedDict
 
+def get_model_size(model):
+    param_size = 0
+    for param in model.parameters():
+        param_size += param.nelement()# * param.element_size()
+    buffer_size = 0
+    #for buffer in model.buffers():
+    #    buffer_size += buffer.nelement() * buffer.element_size()
+
+    size_all_m = (param_size + buffer_size) / 1e+6
+    print('==> model size: {:.3f}M'.format(size_all_m))
+    return size_all_m
+
 
 def draw_pose_skeleton(heatmap, color_palette, filename="fig_full"):
     """

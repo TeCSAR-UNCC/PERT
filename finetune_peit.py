@@ -35,7 +35,7 @@ from configs.config import config
 from configs.config import update_config
 
 # Heatmap
-from utils import init_distributed_mode, get_rank
+from utils import init_distributed_mode, get_rank, get_model_size
 from utils.args_handler import get_args_finetune
 
 from timm.models import create_model
@@ -146,14 +146,16 @@ def main(args):
     device = torch.device(config.device)
 
     # fix the seed for reproducibility
-    seed = args.seed + get_rank()
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    # random.seed(seed)
+    if False:
+        seed = args.seed + get_rank()
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        # random.seed(seed)
 
     cudnn.benchmark = True
 
     model = get_model(args)
+    _ = get_model_size(model)
     filled = fill_the_model(model, args)
     patch_size = model.patch_embed.patch_size
     print("Patch size = %s" % str(patch_size))
@@ -162,6 +164,12 @@ def main(args):
         config.DATASET.Heatmap_Generator.heatmap_size // patch_size[1],
     )
     args.patch_size = patch_size
+
+    if config.PeIT.finetune_checkpoint != "":
+        if ".pt" in config.PeIT.finetune_checkpoint:
+            print("==> Loading the model from a pretrained PT file.")
+            model_sd = torch.load(config.PeIT.finetune_checkpoint)
+            model.load_state_dict(model_sd)
 
     model.to(device)
 
@@ -308,15 +316,16 @@ def main(args):
     chk_epoch = 0
 
     if config.PeIT.finetune_checkpoint != "":
-        _, states = dist_model.load_checkpoint(
-            config.PeIT.finetune_checkpoint,
-        )
-        chk_epoch, chk_top1_val = states["epoch"], states["top1_val"]
-        print(
-            "---> Model loaded from: {}.\n\tLast epoch: {}.\n\tTop1 Validation: {:3.2f}".format(
-                config.PeIT.finetune_checkpoint, chk_epoch, chk_top1_val
+        if not ".pt" in config.PeIT.finetune_checkpoint:
+            _, states = dist_model.load_checkpoint(
+                config.PeIT.finetune_checkpoint,
             )
-        )
+            chk_epoch, chk_top1_val = states["epoch"], states["top1_val"]
+            print(
+                "---> Model loaded from: {}.\n\tLast epoch: {}.\n\tTop1 Validation: {:3.2f}".format(
+                    config.PeIT.finetune_checkpoint, chk_epoch, chk_top1_val
+                )
+            )
     # Let's create the sub folder for saving the checkpoints
     base_directory = Path(config.PeIT.checkpoint_root_folder)
     full_path = base_directory / config.PeIT.custom_run_name

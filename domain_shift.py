@@ -48,21 +48,29 @@ def get_model(args):
     model = create_model(
         args.model,
         img_size=config.DATASET.Heatmap_Generator.heatmap_size,
-        in_chans=config.DATASET.window_size,
+        in_chans=(
+            config.DATASET.window_size
+            if config.DATASET.Heatmap_Generator.joint_reduction
+            else config.DATASET.joint_number
+        ),
         num_classes=config.DATASET.num_classes,
         pretrained=False,
-        drop_path_rate=args.drop_path,
-        drop_block_rate=None,
         use_shared_rel_pos_bias=args.rel_pos_bias,
         use_abs_pos_emb=args.abs_pos_emb,
         init_values=args.layer_scale_init_value,
+        embed_2dpatch=config.PeIT.embed_2dpatch,
+        patch_size=config.PeIT.patch_size,
+        drop_rate=config.PeIT.drop_rate,
+        attn_drop_rate=config.PeIT.attn_drop_rate,
+        drop_path_rate=config.PeIT.drop_path_rate,
     )
 
     return model
 
 
 def main(args):
-    m_3d = True
+    '''
+    m_3d = False
     if m_3d:
         test = ResNet3dSlowOnly(
             in_channels=17,
@@ -85,15 +93,16 @@ def main(args):
             strides=(1, 2, 2),
         )
         data = torch.rand((1, 48, 64, 64))
-
     r = test(data)
+    '''
+    
     cfg = Config.fromfile(args.py_cfg)
     ds = build_dataset(cfg.data.val)
     model = build_model(cfg.model)
     dl = build_dataloader(
         ds,
-        videos_per_gpu=8,
-        workers_per_gpu=8,
+        videos_per_gpu=4,
+        workers_per_gpu=4,
         shuffle=False,
         drop_last=False,
         persistent_workers=False,
@@ -105,6 +114,7 @@ def main(args):
 
     predicted = []
     targets = []
+
     with torch.no_grad():
         for batch in tqdm(dl):
             test_val, label = batch["imgs"], batch["label"]
@@ -115,7 +125,7 @@ def main(args):
             targets.append(label.cpu().numpy())
 
     top1_model, top5_model = calculate_accuracies(predicted, targets, mapping_ucla2ntu)
-
+    print("Top@1={}, top@5={}".format(top1_model, top5_model))
     peit = get_model(args)
     state_peit = torch.load(args.peit_model_weight)
     peit.load_state_dict(state_peit)
@@ -156,6 +166,7 @@ def main(args):
     top1_peit, top5_peit = calculate_accuracies(
         peit_predicted, peit_targets, mapping_ucla2ntu
     )
+    print("PeIT: Top@1={}, top@5={}".format(top1_peit, top5_peit))
     pass
 
 

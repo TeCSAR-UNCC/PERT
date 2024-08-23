@@ -41,17 +41,18 @@ DATASET:
 
 Pretrained_Models:
   discrete_vae_weight_path: ""
-  pretrain_saved_file: "/mnt/DATASETS_RAID_28TB/saved_models/current/RUN1_3DdVAE_HEATMAP_BASE_3DResBlock_Super_Serenity/beit_best_firm-wood-3_pretraining.pt"
+  # pretrain_saved_file: "/mnt/DATASETS_RAID_28TB/saved_models/current/RUN1_3DdVAE_HEATMAP_BASE_3DResBlock_Super_Serenity/beit_best_firm-wood-3_pretraining.pt"
+  pretrain_saved_file: ""
 
 PeIT:
   model: "beit_base"
   finetune_checkpoint: ""
   checkpoint_root_folder: "/mnt/DATASETS_RAID_28TB/saved_models/current"
-  custom_run_name: "NTU120_SUB_RUN1"
+  custom_run_name: "NTU120_SUB_SCRATCH"
   embed_2dpatch: *cj
-  drop_rate: 0.6
-  attn_drop_rate: 0.6
-  drop_path_rate: 0.6
+  drop_rate: 0.4
+  attn_drop_rate: 0.4
+  drop_path_rate: 0.4
   patch_size: 4
   window_size:
     - 0

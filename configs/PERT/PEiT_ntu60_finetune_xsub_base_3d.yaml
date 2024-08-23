@@ -1,12 +1,12 @@
 # Training settings
-epochs: 50
+epochs: 20
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-8
 max_learning_rate: 1.0e-4
-coeff_step_size_up: 5
-coeff_step_size_down: 45
+coeff_step_size_up: 15
+coeff_step_size_down: 5
 weight_decay: 0.0003
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
@@ -45,13 +45,13 @@ Pretrained_Models:
 
 PeIT:
   model: "beit_base"
-  finetune_checkpoint: ""
+  finetune_checkpoint: "/mnt/DATASETS_RAID_28TB/saved_models/current/NTU60_SUB_RUN1/ntu60_sub.pt"
   checkpoint_root_folder: "/mnt/DATASETS_RAID_28TB/saved_models/current"
-  custom_run_name: "NTU60_SUB_RUN1"
+  custom_run_name: "NTU60_SUB_RUN2"
   embed_2dpatch: *cj
-  drop_rate: 0.4
-  attn_drop_rate: 0.4
-  drop_path_rate: 0.4
+  drop_rate: 0.0
+  attn_drop_rate: 0.0
+  drop_path_rate: 0.0
   patch_size: 4
   window_size:
     - 0
