@@ -19,6 +19,7 @@ from timm.models.layers import drop_path, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
 from pyskl.models.cnns import ResNet3dSlowOnly, ResNet
 from dalle_pytorch.dalle_pytorch_3d import PrintModule
+import random
 
 
 def _cfg(url="", **kwargs):
@@ -539,6 +540,33 @@ class VisionTransformer(nn.Module):
         self.head = (
             nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
         )
+        
+    def shuffle(self, tokens, num_groups=9):
+        batch_size, num_tokens, token_dim = tokens.shape
+        tokens_per_group = num_tokens // num_groups
+        
+        # Split tokens into 9 groups
+        token_groups = tokens.view(batch_size, num_groups, tokens_per_group, token_dim)  # Shape: (batch, 9, 36, 768)
+        
+        # Initialize the tensors to store shuffled tokens and labels
+        shuffled_tokens = torch.zeros_like(tokens)  # Will store the shuffled tokens
+        label_tensor = torch.zeros(batch_size, num_tokens, dtype=torch.long)  # Will store the group labels
+
+        # For each data point in the batch, shuffle the groups independently
+        for i in range(batch_size):
+            group_indices = list(range(num_groups))  # Create group indices for this data point
+            random.shuffle(group_indices)  # Shuffle the group indices for this data point
+            
+            # Reorder the token groups according to the shuffled group indices
+            shuffled_tokens[i] = token_groups[i, group_indices, :, :].view(num_tokens, token_dim)  # Reorder and flatten
+            
+            # Assign group labels to the label tensor
+            for j, group_idx in enumerate(group_indices):
+                label_tensor[i, j * tokens_per_group:(j + 1) * tokens_per_group] = group_idx
+
+        return shuffled_tokens, label_tensor
+
+
 
     def forward_features(self, x):
         x = self.patch_embed(x)
@@ -557,22 +585,33 @@ class VisionTransformer(nn.Module):
             x = blk(x, rel_pos_bias=rel_pos_bias)
 
         x = self.norm(x)
-        if self.fc_norm is not None:
+        
+        if self.num_classes != 120:
+            return x[:, 1:, :]
+        elif self.fc_norm is not None:
             t = x[:, 1:, :]
-            return self.fc_norm(t.mean(1))
+            return self.fc_norm(t.mean(1)) #why
         else:
             return x[:, 0]
 
     def forward(self, x):
         x = self.forward_features(x)
         # x = self.drop_before_head(x)
+        ################ Shuffelito! ################
+        x, labels = self.shuffle(x, self.num_classes)
+        #############################################
+        x = self.head(x)
+        return x, labels
+    
+    def inference(self, x):
+        x = self.forward_features(x)
         x = self.head(x)
         return x
 
     def get_intermediate_layers(self, x):
         x = self.patch_embed(x)
         batch_size, seq_len, _ = x.size()
-
+    
         cls_tokens = self.cls_token.expand(
             batch_size, -1, -1
         )  # stole cls_tokens impl from Phil Wang, thanks

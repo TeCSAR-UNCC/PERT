@@ -21,7 +21,7 @@ extra_project_name: "set120"
 #NOTE: Not sure what it is.
 transparent: true
 
-deepspeed: true
+deepspeed: false
 distributed_backend: true
 
 # Dataset Settings
@@ -41,12 +41,12 @@ DATASET:
 
 Pretrained_Models:
   discrete_vae_weight_path: ""
-  pretrain_saved_file: "/mnt/DATASETS_RAID_28TB/saved_models/current/RUN1_3DdVAE_HEATMAP_BASE_3DResBlock_Super_Serenity/beit_best_firm-wood-3_pretraining.pt"
+  pretrain_saved_file: "/home/galinezh/saved_models/current/RUN1_3DdVAE_HEATMAP_BASE_3DResBlock_Super_Serenity/beit_best_firm-wood-3_pretraining.pt"
 
 PeIT:
   model: "beit_base"
-  finetune_checkpoint: "/mnt/DATASETS_RAID_28TB/saved_models/current/NTU120_SET_RUN1/ntu120_set.pt"
-  checkpoint_root_folder: "/mnt/DATASETS_RAID_28TB/saved_models/current"
+  finetune_checkpoint: "/home/galinezh/saved_models/current/NTU120_SET_RUN1/ntu120_set.pt"
+  checkpoint_root_folder: "home/galinezh/saved_models/current"
   custom_run_name: "NTU120_SET_RUN2"
   embed_2dpatch: *cj
   drop_rate: 0.0

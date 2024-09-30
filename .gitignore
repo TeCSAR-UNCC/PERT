@@ -187,3 +187,6 @@ cython_debug/
 
 # History File
 .history
+
+Anomaly_trained_models/
+data/

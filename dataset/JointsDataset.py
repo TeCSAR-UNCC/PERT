@@ -67,7 +67,7 @@ class JointsDataset(Dataset):
         self.num_views = camera_num
         self.window_size = window_size
         self.frame_interval = frame_interval
-        self.total_window = self.window_size * self.frame_interval
+        self.total_window = self.window_size * self.frame_interval # not sure is needed
         self.db = []
         self.linear_interpolate = linear_interpolate
         self.second_heatmap = second_heatmap

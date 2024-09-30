@@ -66,7 +66,8 @@ def get_ab_labels(global_data_np_ab, segs_meta_ab, path_to_vid_dir='', segs_root
 dataset_config = {'ShanghaiTech':[856, 480],
                   'corridor': [640, 360],
                   'combined': [1920, 1080],
-                  'Avenue': [1920, 1080]}
+                  'Avenue': [1920, 1080],
+                  'CPCC': [1280, 720]}
 
 def gen_clip_seg_data_np(clip_dict, start_ofst=0, seg_stride=4, seg_len=24, scene_id='', clip_id='', ret_keys=False,
                          global_pose_data=[], dataset="ShanghaiTech"):
@@ -93,7 +94,7 @@ def gen_clip_seg_data_np(clip_dict, start_ofst=0, seg_stride=4, seg_len=24, scen
                                                                                             clip_id=clip_id,
                                                                                             single_score_np=sing_scores_np,
                                                                                             dataset=dataset)
-        if dataset == 'c1' or dataset == 'c2' or dataset == 'c3'or dataset == 'c4' or dataset == 'combined' or dataset == 'Avenue':
+        if dataset == 'c1' or dataset == 'c2' or dataset == 'c3'or dataset == 'c4' or dataset == 'combined' or dataset == 'Avenue' or dataset=='CPCC':
             curr_pose_score_np = np.zeros(curr_pose_score_np.shape) 
         pose_segs_data.append(curr_pose_segs_np)
         score_segs_data.append(curr_pose_score_np)
