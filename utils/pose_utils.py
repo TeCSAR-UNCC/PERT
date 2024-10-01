@@ -67,7 +67,8 @@ dataset_config = {'ShanghaiTech':[856, 480],
                   'corridor': [640, 360],
                   'combined': [1920, 1080],
                   'Avenue': [1920, 1080],
-                  'CPCC': [1280, 720]}
+                  'CPCC': [1280, 720],
+                  'UBnormal':[856, 480]}
 
 def gen_clip_seg_data_np(clip_dict, start_ofst=0, seg_stride=4, seg_len=24, scene_id='', clip_id='', ret_keys=False,
                          global_pose_data=[], dataset="ShanghaiTech"):
