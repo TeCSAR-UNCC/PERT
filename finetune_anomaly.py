@@ -62,6 +62,8 @@ def get_model(args):
         drop_rate=config.PeIT.drop_rate,
         attn_drop_rate=config.PeIT.attn_drop_rate,
         drop_path_rate=config.PeIT.drop_path_rate,
+        hirarchial=config.DATASET.hirarchial,
+        num_classes_level2=config.DATASET.num_classes_level2,
     )
 
     return model
@@ -98,25 +100,52 @@ def anomaly_inference(model, dataset, dl_validation, device, args, path):
     model.eval()  # Set the model to evaluation mode
     all_scores = []
     all_prob = []
-    with torch.no_grad():  # Disable gradient calculation
-        for _, batch in enumerate(dl_validation):
-            heatmaps = batch[4]
-            heatmaps = heatmaps.to(device, non_blocking=True)
-            with torch.cuda.amp.autocast():
-                outputs = model.inference(heatmaps)
-                batch_size, num_tokens, num_groups = outputs.shape
-                tokens_per_group = num_tokens // num_groups
-                # score = torch.zeros(batch_size)
-                outputs = outputs.view(-1, num_groups)
-                probabilities = F.softmax(outputs, dim=1) 
-                all_prob.extend(probabilities.cpu().numpy())
-                for b in range (batch_size):
-                    p = torch.zeros(num_groups)
-                    for i in range(num_groups):
-                        p[i] = torch.min(probabilities[b*num_tokens+i*tokens_per_group:b*num_tokens+(i+1)*tokens_per_group, i])
-                    score = 1 - torch.min(p)
-                    all_scores.append(score.item())
- 
+    if not args.hirarchial:
+        with torch.no_grad():  # Disable gradient calculation
+            for _, batch in enumerate(dl_validation):
+                heatmaps = batch[4]
+                heatmaps = heatmaps.to(device, non_blocking=True)
+                with torch.cuda.amp.autocast():
+                    outputs = model.inference(heatmaps)
+                    batch_size, num_tokens, num_groups = outputs.shape
+                    tokens_per_group = num_tokens // num_groups
+                    # score = torch.zeros(batch_size)
+                    outputs = outputs.view(-1, num_groups)
+                    probabilities = F.softmax(outputs, dim=1) 
+                    all_prob.extend(probabilities.cpu().numpy())
+                    for b in range (batch_size):
+                        p = torch.zeros(num_groups)
+                        for i in range(num_groups):
+                            p[i] = torch.min(probabilities[b*num_tokens+i*tokens_per_group:b*num_tokens+(i+1)*tokens_per_group, i])
+                        score = 1 - torch.min(p)
+                        all_scores.append(score.item())
+    else:
+        with torch.no_grad():  # Disable gradient calculation
+            for _, batch in enumerate(dl_validation):
+                heatmaps = batch[4]
+                heatmaps = heatmaps.to(device, non_blocking=True)
+                with torch.cuda.amp.autocast():
+                    outputs = model.inference(heatmaps)
+                    batch_size, num_tokens, num_groups = outputs.shape
+                    # tokens_per_group = num_tokens // num_groups
+                    tokens_per_group = num_tokens // (args.num_classes*args.num_classes_level2)
+                    tokens_per_piece = num_tokens // args.num_classes
+                    # score = torch.zeros(batch_size)
+                    outputs = outputs.view(-1, num_groups)
+                    probabilities = F.softmax(outputs, dim=1) 
+                    all_prob.extend(probabilities.cpu().numpy())
+
+                    for b in range (batch_size):
+                        piece_p =  torch.zeros(args.num_classes)
+                        for piece in range(args.num_classes):
+                            p = torch.zeros(args.num_classes_level2)
+                            for i in range(args.num_classes_level2):
+                                p[i] = torch.min(probabilities[b*num_tokens+i*tokens_per_group+piece*tokens_per_piece:b*num_tokens+(i+1)*tokens_per_group+piece*tokens_per_piece, i])
+                            piece_p[piece] = torch.min(p)
+                        score = 1 - torch.min(piece_p)
+                        all_scores.append(score.item())
+            
+
     auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr, threshold_at_target_fnr, gt = score_dataset(np.array(all_scores), dataset.metadata, args=args)
         
     print('AUC ROC: {}'.format(auc_roc))
@@ -127,76 +156,79 @@ def anomaly_inference(model, dataset, dl_validation, device, args, path):
     print('10ER TH: {}'.format(threshold_at_target_fnr))
     
     ######################### confusion matrix ############################
-    if args.test_dataset == 'ShanghaiTech':
-        l = len(all_prob)
-        # Create a base array of size 324 (36 elements of each number 0 to 8)
-        base_array = np.repeat(np.arange(args.num_classes), tokens_per_group)
-
-        # Repeat the base array enough times to cover the length l and then trim the excess
-        labels = np.tile(base_array, l // base_array.size + 1)[:l]
-        predicted_labels = np.argmax(all_prob, axis=1)
-        
-        plt.figure(figsize=(10, 7))
-        conf_matrix = confusion_matrix(labels, predicted_labels)
-        sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=range(args.num_classes), yticklabels=range(args.num_classes))
-        plt.title('Confusion Matrix')
-        plt.xlabel('Predicted')
-        plt.ylabel('True')
-
-        # Save the figure instead of showing it
-        plt.savefig(path+'/confusion_matrix.png')
     
-    else:
-        l = len(all_prob)
-        # Create a base array of size 324 (36 elements of each number 0 to 8)
-        base_array = np.repeat(np.arange(args.num_classes), tokens_per_group)
+    # d = args.num_classes_level2 if args.hirarchial else args.num_classes
+    if not args.hirarchial:
+        if args.test_dataset == 'ShanghaiTech':
+            l = len(all_prob)
+            # Create a base array of size 324 (36 elements of each number 0 to 8)
+            base_array = np.repeat(np.arange(args.num_classes), tokens_per_group)
 
-        # Repeat the base array enough times to cover the length l and then trim the excess
-        labels = np.tile(base_array, l // base_array.size + 1)[:l]
-        predicted_labels = np.argmax(all_prob, axis=1)
-
-        predicted_reshaped = predicted_labels.reshape(len(dataset), 324)
-        labels_reshaped = labels.reshape(len(dataset), 324)
-        
-        index = np.zeros(len(dataset))
-        for i, meta in enumerate(dataset.metadata):
-            scene = meta[0]
-            num = meta[1]
-            s = meta [3]
-            for arr in gt:
-                if arr[0] == scene and arr[1] == num:
-                    f_label = arr[s+2:s+2+dataset.args['seg_len']]
-                    if np.any(f_label == 1):
-                        index[i] = 1
-                    break
+            # Repeat the base array enough times to cover the length l and then trim the excess
+            labels = np.tile(base_array, l // base_array.size + 1)[:l]
+            predicted_labels = np.argmax(all_prob, axis=1)
             
-        normal_labels = labels_reshaped[index==0]
-        normal_pred = predicted_reshaped[index==0]
-        
-        anom_labels = labels_reshaped[index==1]
-        anom_pred = predicted_reshaped[index==1]
-        
-        plt.figure(figsize=(10, 7))
-        conf_matrix = confusion_matrix(normal_labels.reshape(-1), normal_pred.reshape(-1))
-        sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=range(args.num_classes), yticklabels=range(args.num_classes))
-        plt.title('Normal Confusion Matrix')
-        plt.xlabel('Predicted')
-        plt.ylabel('True')
+            plt.figure(figsize=(10, 7))
+            conf_matrix = confusion_matrix(labels, predicted_labels)
+            sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=range(args.num_classes), yticklabels=range(args.num_classes))
+            plt.title('Confusion Matrix')
+            plt.xlabel('Predicted')
+            plt.ylabel('True')
 
-        # Save the figure instead of showing it
-        plt.savefig(path+'/confusion_matrix_normal.png')
+            # Save the figure instead of showing it
+            plt.savefig(path+'/confusion_matrix.png')
         
-        
-        plt.figure(figsize=(10, 7))
-        conf_matrix = confusion_matrix(anom_labels.reshape(-1), anom_pred.reshape(-1))
-        sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=range(args.num_classes), yticklabels=range(args.num_classes))
-        plt.title('Anomalous Confusion Matrix')
-        plt.xlabel('Predicted')
-        plt.ylabel('True')
+        else:
+            l = len(all_prob)
+            # Create a base array of size 324 (36 elements of each number 0 to 8)
+            base_array = np.repeat(np.arange(args.num_classes), tokens_per_group)
 
-        # Save the figure instead of showing it
-        plt.savefig(path+'/confusion_matrix_anom.png')
-        print("hey")
+            # Repeat the base array enough times to cover the length l and then trim the excess
+            labels = np.tile(base_array, l // base_array.size + 1)[:l]
+            predicted_labels = np.argmax(all_prob, axis=1)
+
+            predicted_reshaped = predicted_labels.reshape(len(dataset), 324)
+            labels_reshaped = labels.reshape(len(dataset), 324)
+            
+            index = np.zeros(len(dataset))
+            for i, meta in enumerate(dataset.metadata):
+                scene = meta[0]
+                num = meta[1]
+                s = meta [3]
+                for arr in gt:
+                    if arr[0] == scene and arr[1] == num:
+                        f_label = arr[s+2:s+2+dataset.args['seg_len']]
+                        if np.any(f_label == 1):
+                            index[i] = 1
+                        break
+                
+            normal_labels = labels_reshaped[index==0]
+            normal_pred = predicted_reshaped[index==0]
+            
+            anom_labels = labels_reshaped[index==1]
+            anom_pred = predicted_reshaped[index==1]
+            
+            plt.figure(figsize=(10, 7))
+            conf_matrix = confusion_matrix(normal_labels.reshape(-1), normal_pred.reshape(-1))
+            sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=range(args.num_classes), yticklabels=range(args.num_classes))
+            plt.title('Normal Confusion Matrix')
+            plt.xlabel('Predicted')
+            plt.ylabel('True')
+
+            # Save the figure instead of showing it
+            plt.savefig(path+'/confusion_matrix_normal.png')
+            
+            
+            plt.figure(figsize=(10, 7))
+            conf_matrix = confusion_matrix(anom_labels.reshape(-1), anom_pred.reshape(-1))
+            sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=range(args.num_classes), yticklabels=range(args.num_classes))
+            plt.title('Anomalous Confusion Matrix')
+            plt.xlabel('Predicted')
+            plt.ylabel('True')
+
+            # Save the figure instead of showing it
+            plt.savefig(path+'/confusion_matrix_anom.png')
+            
 
                 
 
@@ -315,7 +347,7 @@ def main(args):
 
         start_epoch = 0
     
-        # anomaly_inference(model, dataset['test'], loader['test'], device, config.DATASET)
+        # anomaly_inference(model, dataset['test'], loader['test'], device, config.DATASET,  str(full_path))
         
         for epoch in range(start_epoch, config.epochs):
             top1 = AverageMeter()
@@ -329,10 +361,12 @@ def main(args):
                 heatmaps = heatmaps.to(device, non_blocking=True)
                 # labels = labels.to(device, non_blocking=True)
 
+                d = config.DATASET.num_classes_level2 if config.DATASET.hirarchial else config.DATASET.num_classes
+
                 with torch.cuda.amp.autocast():
                     outputs, labels = model(heatmaps)
                     loss = nn.CrossEntropyLoss(label_smoothing=0.1)(
-                        input=outputs.view(-1, config.DATASET.num_classes), 
+                        input=outputs.view(-1, d), 
                         target=(labels.view(-1) ).to(device, non_blocking=True))
 
                 opt.zero_grad()
@@ -345,7 +379,7 @@ def main(args):
 
                 avg_loss = loss.item()
 
-                acc = accuracy(outputs.view(-1, config.DATASET.num_classes), (labels.view(-1) ).to(device, non_blocking=True), topk=(1, 5))
+                acc = accuracy(outputs.view(-1, d), (labels.view(-1) ).to(device, non_blocking=True), topk=(1, 5))
 
                 if top1.avg < acc[0]:
                     print("-> Saving model for acc: {:.2f} ".format(top1.avg))

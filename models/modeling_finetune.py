@@ -433,8 +433,12 @@ class VisionTransformer(nn.Module):
         use_mean_pooling=True,
         init_scale=0.001,
         embed_2dpatch=True,
+        hirarchial=False,
+        num_classes_level2=9
     ):
         super().__init__()
+        self.hirarchial = hirarchial
+        self.num_classes_level2 = num_classes_level2
         self.num_classes = num_classes
         self.num_features = self.embed_dim = (
             embed_dim  # num_features for consistency with other models
@@ -491,9 +495,14 @@ class VisionTransformer(nn.Module):
         self.norm = nn.Identity() if use_mean_pooling else norm_layer(embed_dim)
         self.fc_norm = norm_layer(embed_dim) if use_mean_pooling else None
         self.drop_before_head = nn.Dropout(p=0.3)
-        self.head = (
-            nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
-        )
+        if self.hirarchial:
+            self.head = (
+                nn.Linear(embed_dim, self.num_classes_level2) if self.num_classes_level2 > 0 else nn.Identity()
+            )
+        else:        
+            self.head = (
+                nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+            )
 
         if self.pos_embed is not None:
             trunc_normal_(self.pos_embed, std=0.02)
@@ -537,33 +546,74 @@ class VisionTransformer(nn.Module):
 
     def reset_classifier(self, num_classes, global_pool=""):
         self.num_classes = num_classes
-        self.head = (
-            nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
-        )
+        if self.hirarchial:
+            self.head = (
+                nn.Linear(self.embed_dim, self.num_classes_level2) if self.num_classes_level2 > 0 else nn.Identity()
+            )
+        else:
+            self.head = (
+                nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+            )
         
-    def shuffle(self, tokens, num_groups=9):
-        batch_size, num_tokens, token_dim = tokens.shape
-        tokens_per_group = num_tokens // num_groups
-        
-        # Split tokens into 9 groups
-        token_groups = tokens.view(batch_size, num_groups, tokens_per_group, token_dim)  # Shape: (batch, 9, 36, 768)
-        
-        # Initialize the tensors to store shuffled tokens and labels
-        shuffled_tokens = torch.zeros_like(tokens)  # Will store the shuffled tokens
-        label_tensor = torch.zeros(batch_size, num_tokens, dtype=torch.long)  # Will store the group labels
-
-        # For each data point in the batch, shuffle the groups independently
-        for i in range(batch_size):
-            group_indices = list(range(num_groups))  # Create group indices for this data point
-            random.shuffle(group_indices)  # Shuffle the group indices for this data point
+    def shuffle(self, tokens, num_groups=12, hirarchial=False, num_groups_level2=9):
+        if not hirarchial:
+            batch_size, num_tokens, token_dim = tokens.shape
+            tokens_per_group = num_tokens // num_groups
             
-            # Reorder the token groups according to the shuffled group indices
-            shuffled_tokens[i] = token_groups[i, group_indices, :, :].view(num_tokens, token_dim)  # Reorder and flatten
+            # Split tokens into 9 groups
+            token_groups = tokens.view(batch_size, num_groups, tokens_per_group, token_dim)  # Shape: (batch, 9, 36, 768)
             
-            # Assign group labels to the label tensor
-            for j, group_idx in enumerate(group_indices):
-                label_tensor[i, j * tokens_per_group:(j + 1) * tokens_per_group] = group_idx
+            # Initialize the tensors to store shuffled tokens and labels
+            shuffled_tokens = torch.zeros_like(tokens)  # Will store the shuffled tokens
+            label_tensor = torch.zeros(batch_size, num_tokens, dtype=torch.long)  # Will store the group labels
 
+            # For each data point in the batch, shuffle the groups independently
+            for i in range(batch_size):
+                group_indices = list(range(num_groups))  # Create group indices for this data point
+                random.shuffle(group_indices)  # Shuffle the group indices for this data point
+                
+                # Reorder the token groups according to the shuffled group indices
+                shuffled_tokens[i] = token_groups[i, group_indices, :, :].view(num_tokens, token_dim)  # Reorder and flatten
+                
+                # Assign group labels to the label tensor
+                for j, group_idx in enumerate(group_indices):
+                    label_tensor[i, j * tokens_per_group:(j + 1) * tokens_per_group] = group_idx
+        else:
+            batch_size, num_tokens, token_dim = tokens.shape
+            tokens_per_group = num_tokens // num_groups
+            
+            # Split tokens into num_groups groups
+            token_groups = tokens.view(batch_size, num_groups, tokens_per_group, token_dim)  # Shape: (batch, num_groups, tokens_per_group, token_dim)
+            
+            # Initialize the tensors to store shuffled tokens and labels
+            shuffled_tokens = torch.zeros(batch_size * num_groups, tokens_per_group, token_dim, device=tokens.device)  # Final shape should be (batch_size * num_groups, tokens_per_group, token_dim)
+            label_tensor = torch.zeros(batch_size * num_groups, tokens_per_group, dtype=torch.long, device=tokens.device)  # Labels must match the output token shape
+            
+            # For each data point in the batch, process each outer group without shuffling outer groups
+            for i in range(batch_size):
+                for outer_idx in range(num_groups):
+                    inner_tokens = token_groups[i, outer_idx]  # Get tokens of this outer group
+                    tokens_per_inner_group = tokens_per_group // num_groups_level2  # Calculate tokens per inner group
+
+                    # Split the inner tokens into subgroups (level 2 groups)
+                    inner_groups = inner_tokens.view(num_groups_level2, tokens_per_inner_group, token_dim)  # Shape: (num_groups_level2, tokens_per_inner_group, token_dim)
+
+                    # Shuffle the inner groups
+                    inner_group_indices = list(range(num_groups_level2))
+                    random.shuffle(inner_group_indices)
+
+                    # Reorder the tokens in shuffled inner groups and flatten them
+                    shuffled_inner_tokens = inner_groups[inner_group_indices].view(tokens_per_group, token_dim)
+                    
+                    # Assign shuffled tokens to the correct location in the output
+                    shuffled_tokens[i * num_groups + outer_idx] = shuffled_inner_tokens
+
+                    # Assign labels for the shuffled tokens (based only on inner group indices)
+                    for inner_j, inner_group_idx in enumerate(inner_group_indices):
+                        # Labels are based on inner group shuffle indices (ranging from 0 to num_groups_level2 - 1)
+                        label_tensor[i * num_groups + outer_idx, inner_j * tokens_per_inner_group: (inner_j + 1) * tokens_per_inner_group] = inner_group_idx
+
+                    
         return shuffled_tokens, label_tensor
 
 
@@ -598,7 +648,7 @@ class VisionTransformer(nn.Module):
         x = self.forward_features(x)
         # x = self.drop_before_head(x)
         ################ Shuffelito! ################
-        x, labels = self.shuffle(x, self.num_classes)
+        x, labels = self.shuffle(x, self.num_classes, self.hirarchial, self.num_classes_level2)
         #############################################
         x = self.head(x)
         return x, labels
