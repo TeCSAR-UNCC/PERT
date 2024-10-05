@@ -29,7 +29,9 @@ def get_ab_labels(global_data_np_ab, segs_meta_ab, path_to_vid_dir='', segs_root
         clip_metadata = segs_meta_ab[clip_metadata_inds]
         clip_res_fn = os.path.join(path_to_vid_dir, "Scene{}".format(scene_id), clip)
         filelist = sorted(os.listdir(clip_res_fn))
-        clip_gt_lst = [np.array(Image.open(os.path.join(clip_res_fn, fname)).convert('L')) for fname in filelist]
+        # clip_gt_lst = [np.array(Image.open(os.path.join(clip_res_fn, fname)).convert('L')) for fname in filelist]
+        clip_gt_lst = [np.array(Image.open(os.path.join(clip_res_fn, fname)).convert('L')) 
+               for fname in filelist if fname.endswith('.png')]
         # FIX shape bug
         clip_shapes = set([clip_gt.shape for clip_gt in clip_gt_lst])
         min_width = min([clip_shape[0] for clip_shape in clip_shapes])
@@ -60,7 +62,8 @@ def get_ab_labels(global_data_np_ab, segs_meta_ab, path_to_vid_dir='', segs_root
                             np.clip(data[:, 0, 0], 0, clip_gt.shape[2] - 1)
                         ].sum() > data.shape[0] / 2:
                             # This pose is abnormal
-                            labels[person_metadata_inds] = -1
+                            # labels[person_metadata_inds] = -1
+                            labels[person_metadata_inds] = 0
     return labels[:, 0, 0, 0]
 
 dataset_config = {'ShanghaiTech':[856, 480],

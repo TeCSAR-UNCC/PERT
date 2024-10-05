@@ -31,8 +31,8 @@ def shanghaitech_hr_skip(shanghaitech_hr, scene_id, clip_id):
     return False
 
 
-def score_dataset(score, metadata, args=None):
-    gt_arr, scores_arr, info = get_dataset_scores(score, metadata, args=args)
+def score_dataset(score, metadata, args=None, validation=False):
+    gt_arr, scores_arr, info = get_dataset_scores(score, metadata, args=args, validation=validation)
     scores_arr = smooth_scores(scores_arr)
     gt_np = np.concatenate(gt_arr)
     scores_np = np.concatenate(scores_arr)
@@ -40,26 +40,42 @@ def score_dataset(score, metadata, args=None):
     # auc_roc, auc_precision_recall, EER, eer_threshold, fpr_at_target_fnr, threshold_at_target_fnr = score_auc(gt_np, gt_np)
     return auc_roc, auc_precision_recall, EER, eer_threshold, fpr_at_target_fnr, threshold_at_target_fnr, info
 
-def get_dataset_scores(scores, metadata, args=None):
+def get_dataset_scores(scores, metadata, args=None, validation=False):
     dataset_gt_arr = []
     dataset_scores_arr = []
     metadata_np = np.array(metadata)
-
-    clip_list = os.listdir(args.mask_root)
-    clip_list = sorted(fn for fn in clip_list if fn.endswith('.npy'))
     
+    
+    if args.train_dataset == 'UBnormal':
+        if validation:
+            pose_segs_root = 'data/UBnormal/pose/validation'
+        else:
+            pose_segs_root = 'data/UBnormal/pose/test'
+        
+        clip_list = os.listdir(pose_segs_root)
+        clip_list = sorted(
+            fn.replace("alphapose_tracked_person.json", "tracks.npy") for fn in clip_list if fn.endswith('.json'))
+        # per_frame_scores_root = 'data/UBnormal/gt/'
+    else:
+        # per_frame_scores_root = 'data/ShanghaiTech/gt/test_frame_mask/'
+        # clip_list = os.listdir(per_frame_scores_root)
+        # clip_list = sorted(fn for fn in clip_list if fn.endswith('.npy'))
+
+        clip_list = os.listdir(args.mask_root)
+        clip_list = sorted(fn for fn in clip_list if fn.endswith('.npy'))
+        
     info_list = []
     print("Scoring {} clips".format(len(clip_list)))
     for clip in tqdm(clip_list):
         clip_gt, clip_score = get_clip_score(scores, clip, metadata_np, metadata, args.mask_root, args)
-        scene_id, clip_id = (clip.split('.')[0]).split('_')[:2]
+        # scene_id, clip_id = (clip.split('.')[0]).split('_')[:2]
         if clip_score is not None:
             dataset_gt_arr.append(clip_gt)
-            scene_clip_array = np.array([int(scene_id), int(clip_id)])
+            # scene_clip_array = np.array([int(scene_id), int(clip_id)])
             # Convert clip_gt to an array if it's not already one
-            clip_gt_array = np.array(clip_gt)
+            # clip_gt_array = np.array(clip_gt)
             # Ensure both arrays are 1D before concatenating
-            info_list.append(np.concatenate((scene_clip_array, clip_gt_array)))
+            # info_list.append(np.concatenate((scene_clip_array, clip_gt_array)))
             dataset_scores_arr.append(clip_score)
             if args.save_results:
                 if not os.path.exists(args.save_results_dir):
@@ -110,10 +126,15 @@ def smooth_scores(scores_arr, sigma=7):
 
 
 def get_clip_score(scores, clip, metadata_np, metadata, per_frame_scores_root, args):
+    
+    if args.train_dataset == 'UBnormal':
+        type, scene_id, clip_id = re.findall('(abnormal|normal)_scene_(\d+)_scenario(.*)_tracks.*', clip)[0]
+        clip_id = type + "_" + clip_id
 
-    scene_id, clip_id = [int(i) for i in clip.split('.')[0].split('_')[:2]]
-    if shanghaitech_hr_skip((args.test_dataset == 'ShanghaiTech-HR'), scene_id, clip_id):
-        return None, None
+    else:
+        scene_id, clip_id = [int(i) for i in clip.split('.')[0].split('_')[:2]]
+        if shanghaitech_hr_skip((args.test_dataset == 'ShanghaiTech-HR'), scene_id, clip_id):
+            return None, None
     
     clip_metadata_inds = np.where((metadata_np[:, 1] == clip_id) &
                                   (metadata_np[:, 0] == scene_id))[0]
@@ -122,6 +143,9 @@ def get_clip_score(scores, clip, metadata_np, metadata, per_frame_scores_root, a
     clip_res_fn = os.path.join(per_frame_scores_root, clip)
     clip_gt = np.load(clip_res_fn)
 
+    if args.train_dataset != "UBnormal":
+        clip_gt = np.ones(clip_gt.shape) - clip_gt  # 1 is normal, 0 is abnormal
+    
     scores_zeros = np.ones(clip_gt.shape[0]) * np.inf * -1
     if len(clip_fig_idxs) == 0:
         clip_person_scores_dict = {0: np.copy(scores_zeros)}

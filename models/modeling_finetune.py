@@ -636,9 +636,9 @@ class VisionTransformer(nn.Module):
 
         x = self.norm(x)
         
-        if self.num_classes != 120:
-            return x[:, 1:, :]
-        elif self.fc_norm is not None:
+        # if self.num_classes != 120:
+        #     return x[:, 1:, :]
+        if self.fc_norm is not None:
             t = x[:, 1:, :]
             return self.fc_norm(t.mean(1)) #why
         else:
@@ -646,12 +646,8 @@ class VisionTransformer(nn.Module):
 
     def forward(self, x):
         x = self.forward_features(x)
-        # x = self.drop_before_head(x)
-        ################ Shuffelito! ################
-        x, labels = self.shuffle(x, self.num_classes, self.hirarchial, self.num_classes_level2)
-        #############################################
         x = self.head(x)
-        return x, labels
+        return x
     
     def inference(self, x):
         x = self.forward_features(x)

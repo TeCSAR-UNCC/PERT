@@ -1,5 +1,5 @@
 # Training settings
-epochs: 2
+epochs: 10
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
@@ -17,6 +17,7 @@ world_size: 1
 num_workers: 0
 repeated_size_of_dataset: 10joint_reduction and embed
 extra_project_name: "set120"
+freeze_backbone: True
 
 #NOTE: Not sure what it is.
 transparent: true
@@ -28,13 +29,13 @@ distributed_backend: true
 DATASET:
   # train_dataset: "CPCC"
   # test_dataset: "CPCC"
-  train_dataset: "ShanghaiTech"
-  test_dataset: "ShanghaiTech"
+  train_dataset: "UBnormal"
+  test_dataset: "UBnormal"
   window_size: &dws 48 # Dataset Window Size
   stride: 24
   second_heatmap: &dVAE_heatmap_size null
   # num_classes: 9
-  num_classes: 12
+  num_classes: 2
   num_classes_level2: 9
   joint_number: &jn 17
   data_dir: "/home/galinezh/PERT/data"
@@ -42,10 +43,12 @@ DATASET:
   # resolution: (1280, 720)
   specific_clip: None
   # mask_root: "/home/galinezh/PERT/data/CPCC/gt/test_frame_mask/"
-  mask_root: "/home/galinezh/PERT/data/ShanghaiTech/gt/test_frame_mask/"
+  # mask_root: "/home/galinezh/PERT/data/ShanghaiTech/gt/test_frame_mask/"
+  mask_root: "data/UBnormal/gt/"
   save_results: false
   save_results_dir: "/test/"
   hirarchial: true
+  pose_path_train_abnormal: "/home/galinezh/PERT/data/UBnormal/pose/abnormal_train"
 
   Heatmap_Generator:
     # You need to also update `mmcv_config` if you change this value to something else.
@@ -60,7 +63,7 @@ PeIT:
   model: "beit_base"
   finetune_checkpoint: 'None'
   checkpoint_root_folder: "/home/galinezh/PERT/Anomaly_trained_models/"
-  custom_run_name: "SHT_level2_2"
+  custom_run_name: "UBnormal_Freeze1"
   embed_2dpatch: *cj
   drop_rate: 0.0
   attn_drop_rate: 0.0

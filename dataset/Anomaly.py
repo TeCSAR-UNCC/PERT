@@ -168,6 +168,7 @@ class AnomalyDataset(Dataset):
         self.eval = evaluate
         self.debug = debug
         num_clips = None
+        # num_clips=1
         # num_clips = dataset_args.get('specific_clip', None)
         self.return_indices = return_indices
         self.return_metadata = return_metadata
@@ -382,9 +383,12 @@ def get_dataset_and_loader(args, only_test=False):
     dataset_args = {'headless': False,'seg_len': args.DATASET.window_size, 'return_indices': True, 'return_metadata': True,
                     'train_seg_conf_th': 0.0, 'specific_clip': args.DATASET.specific_clip, 'vid_res': args.DATASET.resolution}
     dataset, loader = dict(), dict()
-    splits = ['train', 'test'] if not only_test else ['test']
+    if args.DATASET.train_dataset == 'UBnormal':
+        splits = ['train', 'test', 'validation'] if not only_test else ['test']   
+    else: 
+        splits = ['train', 'test'] if not only_test else ['test']
     for split in splits:
-        evaluate = split == 'test'
+        evaluate = split == 'test' or split == 'validation'
         normalize_pose_segs = False
         # dataset_args['trans_list'] = trans_list[:args.num_transform] if split == 'train' else None
         dataset_args['trans_list'] = None
@@ -392,11 +396,16 @@ def get_dataset_and_loader(args, only_test=False):
         dataset_args['dataset'] = args.DATASET.train_dataset if split == 'train' else args.DATASET.test_dataset 
         dataset_args['puzzle'] = True if split == 'train' else False  # No puzzle needed for inference
         dataset_args['vid_path'] = args.vid_path[split]
+        if split == 'train':
+            abnormal_path = args.DATASET.pose_path_train_abnormal
+        else:
+            abnormal_path = args.pose_path[split]
         dataset[split] = AnomalyDataset(args.pose_path[split], path_to_vid_dir=args.vid_path[split],
                                         is_training=dataset_args['puzzle'],
                                         normalize_pose_segs=normalize_pose_segs,
                                         cfg=args,
                                         evaluate=evaluate,
+                                        abnormal_train_path=abnormal_path,
                                         **dataset_args)
         loader[split] = DataLoader(dataset[split], **loader_args, shuffle=(split == 'train'))
     if only_test:
