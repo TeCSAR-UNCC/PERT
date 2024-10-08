@@ -497,7 +497,7 @@ class VisionTransformer(nn.Module):
         self.drop_before_head = nn.Dropout(p=0.3)
         if self.hirarchial:
             self.head = (
-                nn.Linear(embed_dim, self.num_classes_level2) if self.num_classes_level2 > 0 else nn.Identity()
+                nn.Linear(embed_dim+1, self.num_classes_level2) if self.num_classes_level2 > 0 else nn.Identity()
             )
         else:        
             self.head = (
@@ -589,6 +589,10 @@ class VisionTransformer(nn.Module):
             shuffled_tokens = torch.zeros(batch_size * num_groups, tokens_per_group, token_dim, device=tokens.device)  # Final shape should be (batch_size * num_groups, tokens_per_group, token_dim)
             label_tensor = torch.zeros(batch_size * num_groups, tokens_per_group, dtype=torch.long, device=tokens.device)  # Labels must match the output token shape
             
+            # Create positional embeddings for each group
+            positional_embedding = torch.arange(num_groups, device=tokens.device).unsqueeze(1).expand(-1, tokens_per_group)
+            positional_embedding = positional_embedding.repeat(batch_size, 1)  # Shape: (batch_size * num_groups, tokens_per_group)
+        
             # For each data point in the batch, process each outer group without shuffling outer groups
             for i in range(batch_size):
                 for outer_idx in range(num_groups):
@@ -612,6 +616,10 @@ class VisionTransformer(nn.Module):
                     for inner_j, inner_group_idx in enumerate(inner_group_indices):
                         # Labels are based on inner group shuffle indices (ranging from 0 to num_groups_level2 - 1)
                         label_tensor[i * num_groups + outer_idx, inner_j * tokens_per_inner_group: (inner_j + 1) * tokens_per_inner_group] = inner_group_idx
+                    
+                    # Adding the simple positional embedding and changing the output size to (batch_size * num_groups, tokens_per_group, token_dim + 1)
+                    shuffled_tokens_with_pos = torch.cat([shuffled_tokens, positional_embedding.unsqueeze(-1).float()], dim=-1)
+            shuffled_tokens = shuffled_tokens_with_pos
 
                     
         return shuffled_tokens, label_tensor
@@ -655,6 +663,15 @@ class VisionTransformer(nn.Module):
     
     def inference(self, x):
         x = self.forward_features(x)
+        if self.hirarchial:
+            batch_size, num_tokens, token_dim = x.shape
+            tokens_per_group = num_tokens // self.num_classes
+            # Create positional embeddings for each group
+            positional_embedding = torch.arange(self.num_classes, device=x.device).unsqueeze(1).expand(-1, tokens_per_group)
+            positional_embedding = positional_embedding.reshape((num_tokens,1))
+            positional_embedding = positional_embedding.repeat(batch_size, 1, 1)
+        
+            x = torch.cat([x, positional_embedding.float()], dim=2)
         x = self.head(x)
         return x
 

@@ -168,6 +168,7 @@ class AnomalyDataset(Dataset):
         self.eval = evaluate
         self.debug = debug
         num_clips = None
+        # num_clips = 1
         # num_clips = dataset_args.get('specific_clip', None)
         self.return_indices = return_indices
         self.return_metadata = return_metadata
