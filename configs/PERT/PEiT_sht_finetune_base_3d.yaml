@@ -1,5 +1,5 @@
 # Training settings
-epochs: 10
+epochs: 2
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
@@ -12,7 +12,7 @@ starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
 batch_size: &bs 16
-device: "cuda:1"
+device: "cuda:0"
 world_size: 1
 num_workers: 0
 repeated_size_of_dataset: 10joint_reduction and embed
@@ -47,7 +47,7 @@ DATASET:
   mask_root: "data/UBnormal/gt/"
   save_results: false
   save_results_dir: "/test/"
-  hirarchial: true
+  hirarchial: false
   pose_path_train_abnormal: "/home/galinezh/PERT/data/UBnormal/pose/abnormal_train"
 
   Heatmap_Generator:
