@@ -13,23 +13,29 @@ from operator import itemgetter
 from torch import Tensor
 
 
-
 class NTU_oneShot(Dataset):
-    def __init__(self, cfg, loader_type='train', joint_reduction=True, **kwargs):
+    def __init__(self, cfg, loader_type="train", joint_reduction=True, **kwargs):
         super().__init__(**kwargs)
         self.cfg = cfg
         mmcv_cfg = Config.fromfile(cfg.DATASET.mmcv_config)
 
         self.loader_type = loader_type
-        self.is_training = self.loader_type == 'train'
-        if loader_type == 'train':
+        self.is_training = self.loader_type == "train"
+        if loader_type == "train":
             self.ds = build_dataset(mmcv_cfg.data.train)
-            self.action_set = mmcv.load(mmcv_cfg.data.train.dataset.ann_file)['split']['action_set']
-        elif loader_type == 'val':
+            self.action_set = mmcv.load(mmcv_cfg.data.train.dataset.ann_file)["split"][
+                "action_set"
+            ]
+        elif loader_type == "val":
             self.ds = build_dataset(mmcv_cfg.data.val)
         else:
             self.ds = build_dataset(mmcv_cfg.data.exemplar)
-        
+
+        self.labels = [
+            itemgetter("label")(
+                self.ds.__getitem__(index) for index in range(len(self.ds))
+            )
+        ]
 
     def __len__(self):
         return len(self.ds)
@@ -51,7 +57,7 @@ class NTU_oneShot(Dataset):
 
             pos = itemgetter("imgs")(self.ds.__getitem__(pos_idx)).squeeze(0)
             neg = itemgetter("imgs")(self.ds.__getitem__(neg_idx)).squeeze(0)
-            
+
             if self.cfg.DATASET.Heatmap_Generator.joint_reduction:
                 pos = pos.permute((1, 0, 2, 3))
                 pos, _ = pos.max(axis=1)
@@ -61,6 +67,7 @@ class NTU_oneShot(Dataset):
             return [imgs, pos, neg, label[0]]
         else:
             return [imgs, label]
+
 
 # DATASET = edict({
 #   'train_dataset': "ntu_mmcv",

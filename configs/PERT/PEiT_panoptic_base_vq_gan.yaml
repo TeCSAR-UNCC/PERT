@@ -1,4 +1,12 @@
-# Training settings
+use_vq_gan: true
+
+
+# Model Settings
+VQ_Params:
+    vq_gan_congif: 'pose_quant/configs/c2d_2d_vqgan.yml'
+
+
+  # Training settings
 epochs: 50
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
@@ -11,14 +19,13 @@ weight_decay: 0.05 # Learning rate decay
 starting_temp: 1.0 # Starting temperature
 temp_min: 0.46165 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
-batch_size: &bts 48
+batch_size: &bts 32
 device: 'cuda'
-world_size: 3
-num_workers: 16
+world_size: 1
+num_workers: 8
 gradient_clipping: 3
 fp16_training: True
 wandb_log_dir: '/mnt/DATASETS_RAID_28TB/WAND_B/current/'
-use_vq_gan: true
 
 #NOTE: Not sure what it is.
 transparent: true 
@@ -35,6 +42,7 @@ DATASET:
   window_size: &dws 48 # Dataset Window Size
   frame_interval: 1
   stride: 30
+  joint_number: &jn 17
   joint_req: 0.9
   test_subset: 'validation'
   train_subset: 'train'
@@ -42,45 +50,46 @@ DATASET:
   #"d_vae", "peit" or "fine-tuning"
   training_mode: 'peit'
   resolution: [1920, 1080]
-  drop_frames_rate: 0.1
+  drop_frames_rate: 0.3
   # Some of the NTU video have just around 1 second.
   max_num_frame_rate: 0.9
   linear_interpolate: False
-  second_heatmap: false
-  joint_number: &jn 17
 
   # Heatmap Generator
   Heatmap_Generator:
     use_gaussian_score: false
     with_limb: true
     with_kp: false
-    heatmap_size: &hms 256 # Heatmap Size
+    heatmap_size: &hms 72 # Heatmap Size
     scaling: 1.0
-    joint_reduction: &cj true
+    joint_reduction: &cj false
 
 # Model Settings
 VAE_Params:
   image_size: *hms
-  num_layers: 4 # Number of layers (should be 3 or above)
-  num_tokens: 4096 # Number of image tokens
+  num_layers: 2 # Number of layers (should be 3 or above)
+  num_tokens: 128 # Number of image tokens
   codebook_dim: 512
   hidden_dim: 256
-  channels: *dws
+  channels: *jn
   num_resnet_blocks: 1 # Number of residual net blocks
   smooth_l1_loss: true
   normalization: null
   use_SiLU: True
+  d3d_decoder: false
 
 Pretrained_Models:
-    discrete_vae_weight_path: '/mnt/DATASETS_RAID_28TB/saved_models/03_16/saved_models/vae_48_panoptic_sparkling-dust-77.pt'
+    discrete_vae_weight_path: './saved_models/vae_48_panoptic_super-serenity-1.pt'
     prefix_saved_file: ''
 
 PeIT:
-  model: 'beit_base_patch16'
+  model: 'beit_base_pretrain'
   finetune_checkpoint: ''
   checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
-  custom_run_name: 'RUN1_HEATMAP_ResBlock_BASE'
+  custom_run_name: 'RUN1_3D_QV_GAN'
   embed_2dpatch: *cj
+  # Patch size in pixel
+  patch_size: 4
   window_size:
     - 0
     - 0

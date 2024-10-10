@@ -49,15 +49,15 @@ from utils.args_handler import get_args
 from timm.models import create_model
 from timm.utils import accuracy
 
-from utils.get_dVAE import get_dVAE
+from utils.get_dVAE import get_dVAE, get_VQ_GAN
 
-from utils.axu import AverageMeter, reduce_mean
+from utils.axu import AverageMeter, reduce_mean, create_masked_positions
 
 # Note: Just to enforce to update timm.models dictionary
 import models
 
 
-def get_model(args):
+def get_model(args, using_vq_gan=False):
     print(f"Creating model: {args.model}")
     in_chan = (
         config.DATASET.window_size
@@ -78,6 +78,7 @@ def get_model(args):
         single_cnn=not (args.disable_single_cnn),
         embed_2dpatch=config.PeIT.embed_2dpatch,
         patch_size=config.PeIT.patch_size,
+        using_vq_gan=using_vq_gan,
     )
 
     # Do we have a checkpoint to start from?
@@ -136,6 +137,12 @@ def main(args):
     args.config = config
     args.model = config.PeIT.model
 
+    discritizer_type = "QV_GAN"
+    if "use_vq_gan" in config:
+        using_vq_gan = config.use_vq_gan
+    else:
+        using_vq_gan = False
+
     device = torch.device(config.device)
 
     # fix the seed for reproducibility
@@ -146,7 +153,7 @@ def main(args):
 
     cudnn.benchmark = True
 
-    model = get_model(args)
+    model = get_model(args, using_vq_gan)
     patch_size = model.patch_embed.patch_size
     print("Patch size = %s" % str(patch_size))
     config.PeIT.window_size = (
@@ -163,8 +170,13 @@ def main(args):
         distributed_utils.DeepSpeedBackend
     )
 
-    dVAE = get_dVAE(config)
-    dVAE = dVAE.to(device)
+    if using_vq_gan:
+        dVAE = get_VQ_GAN(config)
+        dVAE = dVAE.to(device)
+    else:
+        dVAE = get_dVAE(config)
+        dVAE = dVAE.to(device)
+        discritizer_type = "dVAE"
 
     # data
     ds = eval("dataset." + config.DATASET.train_dataset)(config, is_training=True)
@@ -180,7 +192,7 @@ def main(args):
 
     dl = DataLoader(
         ds,
-        1 if debug else config.batch_size,
+        2 if debug else config.batch_size,
         shuffle=not data_sampler,
         sampler=data_sampler,
         num_workers=0 if debug else config.num_workers,
@@ -321,11 +333,12 @@ def main(args):
             iteration_size=iteration_size,
             wandb_dir=config.wandb_log_dir,
             embed_2dpatch=config.PeIT.embed_2dpatch,
+            discritizer_type=discritizer_type,
         )
 
         run = wandb.init(
-            project="BEiT_window_{}_model_{}".format(
-                config.DATASET.window_size, args.model
+            project="BEiT_window_{}_model_{}_{}".format(
+                config.DATASET.window_size, args.model, discritizer_type
             ),
             job_type="pre-training",
             config=model_config,
@@ -357,8 +370,17 @@ def main(args):
             bool_masked_pos = bool_masked_pos.to(device, non_blocking=True)
 
             with torch.no_grad():
-                input_ids = dVAE.get_codebook_indices(dvae_heatmap).flatten(1)
-                bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
+                if not using_vq_gan:
+                    input_ids = dVAE.get_codebook_indices(dvae_heatmap).flatten(1)
+                    bool_masked_pos = bool_masked_pos.flatten(1).to(torch.bool)
+                else:
+                    # need to create bool_masked_pos
+                    _, _, _, input_ids = dVAE.encode(dvae_heatmap)
+                    bool_masked_pos = create_masked_positions(
+                        input_ids,
+                        config.PeIT.max_mask_patches_per_block,
+                        config.PeIT.min_mask_patches_per_block,
+                    )
                 labels = input_ids[bool_masked_pos]
 
             with torch.cuda.amp.autocast():

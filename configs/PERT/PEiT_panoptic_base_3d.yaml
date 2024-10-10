@@ -22,8 +22,8 @@ wandb_log_dir: '/mnt/DATASETS_RAID_28TB/WAND_B/current/'
 #NOTE: Not sure what it is.
 transparent: true 
 
-deepspeed: true
-distributed_backend: true
+deepspeed: false
+distributed_backend: false
                                                              
 
 # Dataset Settings
@@ -78,7 +78,7 @@ PeIT:
   model: 'beit_base_8k'
   finetune_checkpoint: ''
   checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
-  custom_run_name: 'RUN1_3DdVAE_HEATMAP_BASE_3DResBlock_Super_Serenity'
+  custom_run_name: 'RUN1_3DdVAE_HEATMAP_BASE_3DResBlock_Super_Serenity_debug'
   embed_2dpatch: *cj
   # Patch size in pixel
   patch_size: 4

@@ -406,6 +406,34 @@ class RelativePositionBias(nn.Module):
         return relative_position_bias.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
 
 
+class Conv3DBlock(nn.Module):
+    def __init__(self):
+        super(Conv3DBlock, self).__init__()
+
+        # Abs. useless
+        self.patch_size = (8, 8)
+
+        self.conv_block = nn.Sequential(
+            nn.Conv3d(17, 192, kernel_size=3, stride=(2, 3, 3), padding=1),
+            nn.BatchNorm3d(192),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(192, 384, kernel_size=3, stride=(2, 1, 1), padding=1),
+            nn.BatchNorm3d(384),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(384, 576, kernel_size=3, stride=(2, 3, 3), padding=1),
+            nn.BatchNorm3d(576),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(576, 768, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm3d(768),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool3d((4, 8, 8)),
+        )
+
+    def forward(self, x, **kwargs):
+        features = self.conv_block(x)
+        return features.flatten(2).transpose(1, 2)
+
+
 class VisionTransformer(nn.Module):
     """Vision Transformer with support for patch or hybrid CNN input stage"""
 
@@ -432,6 +460,7 @@ class VisionTransformer(nn.Module):
         use_mean_pooling=True,
         init_scale=0.001,
         embed_2dpatch=True,
+        using_vq_gan=False,
     ):
         super().__init__()
         self.num_classes = num_classes
@@ -439,14 +468,18 @@ class VisionTransformer(nn.Module):
             embed_dim  # num_features for consistency with other models
         )
 
-        self.patch_embed = PatchEmbed(
-            img_size=img_size,
-            patch_size=patch_size,
-            in_chans=in_chans,
-            embed_dim=embed_dim,
-            embed_2dpatch=embed_2dpatch,
-        )
-        num_patches = self.patch_embed.num_patches
+        if not using_vq_gan:
+            self.patch_embed = PatchEmbed(
+                img_size=img_size,
+                patch_size=patch_size,
+                in_chans=in_chans,
+                embed_dim=embed_dim,
+                embed_2dpatch=embed_2dpatch,
+            )
+            num_patches = self.patch_embed.num_patches
+        else:
+            self.patch_embed = Conv3DBlock()
+            num_patches = 256
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         # self.mask_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -456,7 +489,7 @@ class VisionTransformer(nn.Module):
             self.pos_embed = None
         self.pos_drop = nn.Dropout(p=drop_rate)
 
-        if use_shared_rel_pos_bias:
+        if use_shared_rel_pos_bias and not using_vq_gan:
             self.rel_pos_bias = RelativePositionBias(
                 window_size=self.patch_embed.patch_shape, num_heads=num_heads
             )

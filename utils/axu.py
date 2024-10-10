@@ -8,16 +8,17 @@ import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
 from collections import OrderedDict
 
+
 def get_model_size(model):
     param_size = 0
     for param in model.parameters():
-        param_size += param.nelement()# * param.element_size()
+        param_size += param.nelement()  # * param.element_size()
     buffer_size = 0
-    #for buffer in model.buffers():
+    # for buffer in model.buffers():
     #    buffer_size += buffer.nelement() * buffer.element_size()
 
-    size_all_m = (param_size + buffer_size) / 1e+6
-    print('==> model size: {:.3f}M'.format(size_all_m))
+    size_all_m = (param_size + buffer_size) / 1e6
+    print("==> model size: {:.3f}M".format(size_all_m))
     return size_all_m
 
 
@@ -793,6 +794,62 @@ def convert_to_rgb_3d(array, offset=10):
             output[t, 0:, 0:, n * W : (n + 1) * W] = colored_heatmap
 
     return output
+
+
+def create_masked_positions(
+    input_ids,
+    max_mask_patches_per_block,
+    min_mask_patches_per_block,
+    mask_prob=0.4,
+    mask_block_size=16,
+):
+    """
+    Create a boolean mask for masked training in a BeIT-like network.
+
+    Args:
+    - input_ids (torch.Tensor): Input tensor of shape (batch_size, seq_length)
+    - max_mask_patches_per_block (float): Maximum fraction of patches to mask per block [0, 1]
+    - min_mask_patches_per_block (float): Minimum fraction of patches to mask per block [0, 1]
+    - mask_prob (float): Overall probability of masking a patch
+    - mask_block_size (int): Size of each block for block-wise masking
+
+    Returns:
+    - bool_masked_pos (torch.Tensor): Boolean tensor indicating masked positions
+    """
+
+    batch_size, seq_length = input_ids.shape
+
+    # Ensure max and min are within [0, 1]
+    max_mask_patches_per_block = max(0, min(1, max_mask_patches_per_block))
+    min_mask_patches_per_block = max(0, min(1, min_mask_patches_per_block))
+
+    # Calculate the number of patches to mask per block
+    max_masked_patches_per_block = int(mask_block_size * max_mask_patches_per_block)
+    min_masked_patches_per_block = int(mask_block_size * min_mask_patches_per_block)
+
+    # Initialize the mask
+    bool_masked_pos = torch.zeros((batch_size, seq_length), dtype=torch.bool)
+
+    for i in range(batch_size):
+        for block_start in range(0, seq_length, mask_block_size):
+            block_end = min(block_start + mask_block_size, seq_length)
+            block_size = block_end - block_start
+
+            # Determine number of patches to mask in this block
+            num_mask = np.random.randint(
+                min_masked_patches_per_block, max_masked_patches_per_block + 1
+            )
+            num_mask = min(num_mask, block_size)
+
+            # Randomly select patches to mask within the block
+            mask_indices = np.random.choice(block_size, num_mask, replace=False)
+            bool_masked_pos[i, block_start + mask_indices] = True
+
+    # Apply overall mask probability
+    random_mask = torch.rand(bool_masked_pos.shape) < mask_prob
+    bool_masked_pos = bool_masked_pos & random_mask
+
+    return bool_masked_pos
 
 
 if __name__ == "__main__":
