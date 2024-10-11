@@ -41,7 +41,46 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_score, recall_score, f1_score
 
+
+
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=0.75, gamma=2.0, weight=None, reduction='mean'):
+        """
+        Parameters:
+        - alpha: Alpha should be higher for the minority class (class 0 in your case). 
+                 For example, alpha for class 0 could be 0.75 and for class 1 it could be 0.25.
+        - gamma: Focusing parameter to down-weight easy examples.
+        - weight: Class weights for CrossEntropyLoss to handle class imbalance (higher for class 0).
+        - reduction: Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
+        """
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha  # alpha controls the focus on class 0 (minority)
+        self.gamma = gamma
+        self.weight = weight
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        # Compute cross-entropy loss without reduction (element-wise loss)
+        ce_loss = F.cross_entropy(inputs, targets, weight=self.weight, reduction='none')
+
+        # Get the probabilities of the true class (softmax applied to logits, then exponentiated)
+        pt = torch.exp(-ce_loss)  # pt is the probability of the true class
+
+        # Apply Focal Loss formula: focus on harder examples based on pt
+        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
+
+        # Apply reduction (mean or sum)
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        else:
+            return focal_loss
+        
+        
 def get_model(args):
     print(f"Creating model: {args.model}")
     model = create_model(
@@ -69,9 +108,41 @@ def get_model(args):
     return model
 
 
-def save_model(path, model, epoch, acc_val=0):
-    save_obj = {"epoch": epoch, "acc_val": acc_val, "weights": model.state_dict()}
+def save_model(path, model, epoch, roc_val=0):
+    save_obj = {"epoch": epoch, "roc_val": roc_val, "weights": model.state_dict()}
     torch.save(save_obj, path)
+
+
+# def validate(model, dl_validation, dataset, device, config=None):
+#     model.eval()  # Set the model to evaluation mode
+#     with torch.no_grad():  # Disable gradient calculation
+#         top1 = AverageMeter()
+#         top5 = AverageMeter()
+#         all_scores = [] 
+        
+#         for _, batch in enumerate(dl_validation):
+#             data = batch[4]
+#             target = batch[3]
+
+#             data, target = data.to(device), target.to(device)
+#             with torch.cuda.amp.autocast():
+#                 outputs = model(data)
+
+#             # acc = accuracy(outputs, target, topk=(1, 5))
+
+#             # top1.update(acc[0], data.size(0))
+#             # top5.update(acc[1], data.size(0))
+            
+#             probabilities = F.softmax(outputs, dim=1) 
+#             if not config['validation']:
+#                 all_scores.extend(probabilities[:, 1].cpu().numpy())
+    
+#     if not config['validation']:
+#         auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr, threshold_at_target_fnr, gt = score_dataset(np.array(all_scores), dataset.metadata, args=config.DATASET, validation=config['validation'])
+#         return top1.avg, top5.avg, auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr
+#     else:
+#         return top1.avg, top5.avg
+
 
 
 def validate(model, dl_validation, dataset, device, config=None):
@@ -83,26 +154,15 @@ def validate(model, dl_validation, dataset, device, config=None):
         
         for _, batch in enumerate(dl_validation):
             data = batch[4]
-            target = batch[3]
-
-            data, target = data.to(device), target.to(device)
+            data = data.to(device)
             with torch.cuda.amp.autocast():
                 outputs = model(data)
-
-            acc = accuracy(outputs, target, topk=(1, 5))
-
-            top1.update(acc[0], data.size(0))
-            top5.update(acc[1], data.size(0))
-            
             probabilities = F.softmax(outputs, dim=1) 
-            if not config['validation']:
-                all_scores.extend(probabilities[:, 1].cpu().numpy())
+            all_scores.extend(probabilities[:, 1].cpu().numpy())
     
-    if not config['validation']:
         auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr, threshold_at_target_fnr, gt = score_dataset(np.array(all_scores), dataset.metadata, args=config.DATASET, validation=config['validation'])
-        return top1.avg, top5.avg, auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr
-    else:
-        return top1.avg, top5.avg
+        return auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr
+
 
 def anomaly_inference(model, dataset, dl_validation, device, args, path):
     model.eval()  # Set the model to evaluation mode
@@ -380,9 +440,21 @@ def main(args):
         # anomaly_inference(model, dataset['test'], loader['test'], device, config.DATASET,  str(full_path))
         val_roc = 0
         val_acc = 0
+        
+        weights = torch.tensor([float(config.abnormal_w), 1.0]).to(device)  # Make sure the weights tensor is on the same device
+        
+        if config.focal_loss:
+            loss_fn = FocalLoss(alpha=float(config.alpha), gamma=float(config.gamma), weight=weights)
+        else:  
+            loss_fn = nn.CrossEntropyLoss(label_smoothing=0.1, weight=weights)
+        
         for epoch in range(start_epoch, config.epochs):
             top1 = AverageMeter()
             top5 = AverageMeter()
+            # List to store true labels and predicted labels for the current epoch
+            all_labels = []
+            all_preds = []
+
             for i, batch in enumerate(loader['train']):
                 model.train()
 
@@ -392,13 +464,9 @@ def main(args):
                 heatmaps = heatmaps.to(device, non_blocking=True)
                 # labels = labels.to(device, non_blocking=True)
 
-                d = config.DATASET.num_classes_level2 if config.DATASET.hirarchial else config.DATASET.num_classes
-
-                with torch.cuda.amp.autocast():
+                with torch.amp.autocast('cuda'):
                     outputs = model(heatmaps)
-                    loss = nn.CrossEntropyLoss(label_smoothing=0.1)(
-                        input=outputs, 
-                        target=labels.to(device, non_blocking=True))
+                    loss = loss_fn(outputs, labels.to(device, non_blocking=True))
 
                 opt.zero_grad()
                 loss.backward()
@@ -410,31 +478,43 @@ def main(args):
 
                 avg_loss = loss.item()
 
+                # Get predictions and move to CPU for metrics calculation
+                preds = torch.argmax(outputs, dim=1).cpu().numpy()
+                true_labels = labels.cpu().numpy()
+
+                # Append batch predictions and true labels to the list
+                all_preds.extend(preds)
+                all_labels.extend(true_labels)
+
+                # You can still calculate accuracy if needed for reference
                 acc = accuracy(outputs, labels.to(device, non_blocking=True), topk=(1, 5))
 
-                # if top1.avg < acc[0]:
-                #     print("-> Saving model for acc: {:.2f} ".format(top1.avg))
-                #     chk_path = str(full_path / "beit_best_{}_anomaly.pt".format(run.name))
-                #     save_model(chk_path, model, epoch=epoch, top1_val=acc[0])
-                
-                
-                
                 top1.update(acc[0], heatmaps.size(0))
                 top5.update(acc[1], heatmaps.size(0))
 
                 if i % 100 == 0:
                     lr = sched.get_last_lr()[0]
-                    print(epoch + 1, i, f"lr - {lr:6f} loss - {avg_loss}")
+                    print(epoch + 1, i, f"lr - {lr:6f} loss - {avg_loss} accuracy - {top1.avg}")
+
+                    # After every 100 iterations, calculate precision, recall, and F1 score for label 0 (abnormal)
+                    precision = precision_score(all_labels, all_preds, pos_label=0)
+                    recall = recall_score(all_labels, all_preds, pos_label=0)
+                    f1 = f1_score(all_labels, all_preds, pos_label=0)
 
                     logs = {
                         **logs,
                         "Top-1 (Training)": top1.avg,
                         "Top-5 (Training)": top5.avg,
+                        "Precision (label 0)": precision,
+                        "Recall (label 0)": recall,
+                        "F1 Score (label 0)": f1,
                         "epoch": epoch + 1,
                         "loss": avg_loss,
                         "lr": lr,
                     }
-                
+
+                    print(f"Precision: {precision:.4f}, Recall: {recall:.4f}, F1 Score: {f1:.4f}, Top1: {top1.avg:.4f}")
+                        
 
                     wandb.log(logs)
                     
@@ -455,7 +535,14 @@ def main(args):
             #     device, 
             #     config
             # )
-            acc_val_top1, acc_val_top5 = validate(
+            # acc_val_top1, acc_val_top5 = validate(
+            #     model,
+            #     loader['validation'],
+            #     dataset['validation'],
+            #     device, 
+            #     config
+            # )
+            auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
                 model,
                 loader['validation'],
                 dataset['validation'],
@@ -465,35 +552,42 @@ def main(args):
             end = time.time()
             print("Validation took: {}".format(end - start))
 
-            # if val_roc < auc_roc:
-            #     # save trained model to wandb as an artifact every epoch's end
-
-            #     print("-> Saving model for ROC: {:.2f} ".format(auc_roc))
-            #     print("-> With acc: {:.2f} ".format(acc_val_top1))
-            #     chk_path = str(full_path / "beit_best_{}_anomaly.pt".format(run.name))
-            #     save_model(chk_path, model, epoch=epoch, roc_val=auc_roc)
-                
-            #     val_roc = auc_roc
-            if val_acc < acc_val_top1:
+            if val_roc < auc_roc:
                 # save trained model to wandb as an artifact every epoch's end
 
-                print("-> Saving model for Accuracy: {:.2f} ".format(acc_val_top1))
+                print("-> Saving model for ROC: {:.2f} ".format(auc_roc))
                 chk_path = str(full_path / "beit_best_{}_anomaly.pt".format(run.name))
-                save_model(chk_path, model, epoch=epoch, acc_val=acc_val_top1)
-                val_acc = acc_val_top1
+                save_model(chk_path, model, epoch=epoch, roc_val=auc_roc)
+                
+                val_roc = auc_roc
+            # if val_acc < acc_val_top1:
+            #     # save trained model to wandb as an artifact every epoch's end
+
+            #     print("-> Saving model for Accuracy: {:.2f} ".format(acc_val_top1))
+            #     chk_path = str(full_path / "beit_best_{}_anomaly.pt".format(run.name))
+            #     save_model(chk_path, model, epoch=epoch, acc_val=acc_val_top1)
+            #     val_acc = acc_val_top1
 
         wandb.finish()
         print("-> Starting Test...")
         config['validation'] = False
         start = time.time()
         # anomaly_inference (model, dataset['test'], loader['test'], device, config.DATASET, str(full_path))
-        acc_val_top1, acc_val_top5, auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
-                    model,
-                    loader['test'],
-                    dataset['test'],
-                    device, 
-                    config
-                )
+        # acc_val_top1, acc_val_top5, auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
+        #             model,
+        #             loader['test'],
+        #             dataset['test'],
+        #             device, 
+        #             config
+        #         )
+        
+        auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
+                model,
+                loader['test'],
+                dataset['test'],
+                device, 
+                config
+            )
         end = time.time()
         
         print("Validation took: {}".format(end - start))
@@ -502,7 +596,7 @@ def main(args):
         print('EER: {}'.format(eer))
         print('EER TH: {}'.format(eer_th))
         print('10ER: {}'.format(fpr_at_target_fnr))
-        print('Accuracy: {}'.format(acc_val_top1))
+        # print('Accuracy: {}'.format(acc_val_top1))
     
     else:
         base_directory = Path(config.PeIT.checkpoint_root_folder)
@@ -511,13 +605,21 @@ def main(args):
         config['validation'] = False
         start = time.time()
         # anomaly_inference (model, dataset['test'], loader['test'], device, config.DATASET, str(full_path))
-        acc_val_top1, acc_val_top5, auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
-                    model,
-                    loader['test'],
-                    dataset['test'],
-                    device, 
-                    config
-                )
+        # acc_val_top1, acc_val_top5, auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
+        #             model,
+        #             loader['test'],
+        #             dataset['test'],
+        #             device, 
+        #             config
+        #         )
+        
+        auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
+                model,
+                loader['test'],
+                dataset['test'],
+                device, 
+                config
+            )
         end = time.time()
         print("Validation took: {}".format(end - start))
         print('AUC ROC: {}'.format(auc_roc))
@@ -525,7 +627,7 @@ def main(args):
         print('EER: {}'.format(eer))
         print('EER TH: {}'.format(eer_th))
         print('10ER: {}'.format(fpr_at_target_fnr))
-        print('Accuracy: {}'.format(acc_val_top1))
+        # print('Accuracy: {}'.format(acc_val_top1))
    
         # print("-> Starting validation...")
         # start = time.time()

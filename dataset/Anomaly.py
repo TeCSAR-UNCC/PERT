@@ -40,6 +40,44 @@ SHANGHAITECH_HR_SKIP = [(1, 130), (1, 135), (1, 136), (6, 144), (6, 145), (12, 1
 logger = logging.getLogger(__name__)
 
 
+
+def augment_pose_sequence_2d(pose_sequence, image_width=None):
+    """
+    Apply spatial augmentations to 2D pose sequences (x, y) consistently across all frames.
+    
+    Args:
+        pose_sequence: A numpy array of shape (2, T, V), where:
+                        2: Number of channels (x, y coordinates)
+                        T: Number of frames
+                        V: Number of joints/keypoints
+        image_width: The width of the image. If provided, x-coordinates will be adjusted to stay within valid range.
+        
+    Returns:
+        Augmented 2D pose sequence.
+    """
+    # Augmentation: Random Scaling (same scaling for all frames)
+    if random.random() < 0.5:
+        scale_factor = np.random.uniform(0.9, 1.1)  # Scale by 90% to 110%
+        pose_sequence[:2, :, :] *= scale_factor  # Apply scaling to both x and y coordinates
+
+    # Augmentation: Random Jittering (same noise added to all frames)
+    if random.random() < 0.5:
+        jitter_noise = np.random.normal(0, 0.02, size=pose_sequence[:2, :, :].shape)  # Add small Gaussian noise
+        pose_sequence[:2, :, :] += jitter_noise
+
+    # Augmentation: Horizontal Flip (consistent flipping for all frames)
+    if random.random() < 0.5:
+        pose_sequence[0, :, :] *= -1  # Flip x-coordinates across all frames
+
+        if image_width is not None:
+            # Adjust the flipped x-coordinates so they remain within [0, image_width]
+            max_x_after_flip = np.max(pose_sequence[0, :, :])
+            shift_value = image_width - max_x_after_flip
+            pose_sequence[0, :, :] += shift_value  # Shift x-coordinates to valid range
+    
+    return pose_sequence
+
+
 # COCO17_JOINTS_DEF = {
 #     "nose": 0,
 #     "l-eye": 1,
@@ -199,12 +237,11 @@ class AnomalyDataset(Dataset):
             self.segs_meta_ab = np.array(self.segs_meta_ab)
             ab_labels = get_ab_labels(self.segs_data_np_ab, self.segs_meta_ab, path_to_vid_dir, abnormal_train_path)
             num_normal_samp = self.segs_data_np.shape[0]
-            num_abnormal_samp = (ab_labels == -1).sum()
+            num_abnormal_samp = (ab_labels == 0).sum()
             total_num_normal_samp = num_normal_samp + (ab_labels == 1).sum()
             print("Num of abnormal sapmles: {}  | Num of normal samples: {}  |  Precent: {}".format(
                 num_abnormal_samp, total_num_normal_samp, num_abnormal_samp / total_num_normal_samp))
-            self.labels = np.concatenate((np.ones(num_normal_samp), ab_labels),
-                                         axis=0).astype(int)
+            
             self.segs_data_np = np.concatenate((self.segs_data_np, self.segs_data_np_ab), axis=0)
             self.segs_meta = np.concatenate((self.segs_meta, self.segs_meta_ab), axis=0)
             self.global_data_np = np.concatenate((self.global_data_np, self.global_data_np_ab), axis=0)
@@ -212,6 +249,40 @@ class AnomalyDataset(Dataset):
                 (self.segs_score_np, self.segs_score_np_ab), axis=0)
             self.global_data += self.global_data_ab
             self.person_keys.update(self.person_keys_ab)
+            
+            # Generate augmented data for class 0 (minority class)
+            self.augmented_data = []
+            self.augmented_labels = []
+            for i, label in enumerate(ab_labels):
+                if label == 0 and self.is_training:
+                    for i in range(cfg.DATASET.aug_abnormal):
+                        augmented_pose = augment_pose_sequence_2d(np.copy(self.segs_data_np[i]), image_width=eval(self.cfg.DATASET.resolution)[0])
+                        self.augmented_data.append(augmented_pose)
+                        self.augmented_labels.append(0)
+                    
+            
+            # Convert to numpy arrays
+            if len(self.augmented_data) > 0:
+                self.augmented_data = np.array(self.augmented_data)
+                # self.augmented_labels = np.array(self.augmented_labels)
+
+                # Concatenate the augmented data and labels with the original data
+                self.segs_data_np = np.concatenate((self.segs_data_np, self.augmented_data), axis=0)
+                # self.labels = np.concatenate((self.labels, self.augmented_labels), axis=0)
+                
+                
+                self.augmented_labels = np.array(self.augmented_labels)
+                ab_labels = np.concatenate((ab_labels, self.augmented_labels), axis=0)
+                num_abnormal_samp = (ab_labels == 0).sum()
+                print("Num of abnormal sapmles after augmentation: {}  | Num of normal samples: {}  |  Precent: {}".format(
+                    num_abnormal_samp, total_num_normal_samp, num_abnormal_samp / total_num_normal_samp))
+                aug_seg_score = np.ones((len(self.augmented_data),self.cfg.DATASET.window_size))
+                self.segs_score_np = np.concatenate(
+                    (self.segs_score_np, aug_seg_score), axis=0)
+            
+            self.labels = np.concatenate((np.ones(num_normal_samp), ab_labels),
+                                         axis=0).astype(int)
+            
         else:
             self.labels = np.ones(self.segs_data_np.shape[0])
         # Convert person keys to ints
@@ -399,7 +470,8 @@ def get_dataset_and_loader(args, only_test=False):
         if split == 'train':
             abnormal_path = args.DATASET.pose_path_train_abnormal
         else:
-            abnormal_path = args.pose_path[split]
+            # abnormal_path = args.pose_path[split]
+            abnormal_path=None
         dataset[split] = AnomalyDataset(args.pose_path[split], path_to_vid_dir=args.vid_path[split],
                                         is_training=dataset_args['puzzle'],
                                         normalize_pose_segs=normalize_pose_segs,

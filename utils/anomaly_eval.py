@@ -162,6 +162,6 @@ def get_clip_score(scores, clip, metadata_np, metadata, per_frame_scores_root, a
         clip_person_scores_dict[person_id][pid_frame_inds + int(args.window_size / 2)] = pid_scores
 
     clip_ppl_score_arr = np.stack(list(clip_person_scores_dict.values()))
-    clip_score = np.amax(clip_ppl_score_arr, axis=0)
+    clip_score = np.amin(clip_ppl_score_arr, axis=0)
 
     return clip_gt, clip_score

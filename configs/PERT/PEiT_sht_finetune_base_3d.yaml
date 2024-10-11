@@ -1,10 +1,10 @@
 # Training settings
-epochs: 10
+epochs: 35
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
 base_learning_rate: 1.0e-8
-max_learning_rate: 1.0e-4
+max_learning_rate: 1.0e-5
 coeff_step_size_up: 15
 coeff_step_size_down: 5
 weight_decay: 0.0003
@@ -14,10 +14,14 @@ num_images_save: 4 # Number of images to save
 batch_size: &bs 16
 device: "cuda:1"
 world_size: 1
-num_workers: 0
+num_workers: 8
 repeated_size_of_dataset: 10joint_reduction and embed
 extra_project_name: "set120"
-freeze_backbone: True
+freeze_backbone: False
+focal_loss: false
+alpha: 0.9
+gamma: 2.0
+abnormal_w: 2.0
 
 #NOTE: Not sure what it is.
 transparent: true
@@ -39,17 +43,17 @@ DATASET:
   num_classes_level2: 9
   joint_number: &jn 17
   data_dir: "/home/galinezh/PERT/data"
-  resolution: (856, 480)
-  # resolution: (1280, 720)
+  # resolution: (856, 480)
+  resolution: (1280, 720)
   specific_clip: None
   # mask_root: "/home/galinezh/PERT/data/CPCC/gt/test_frame_mask/"
   # mask_root: "/home/galinezh/PERT/data/ShanghaiTech/gt/test_frame_mask/"
   mask_root: "data/UBnormal/gt/"
   save_results: false
   save_results_dir: "/test/"
-  hirarchial: true
+  hirarchial: false
   pose_path_train_abnormal: "/home/galinezh/PERT/data/UBnormal/pose/abnormal_train"
-
+  aug_abnormal: 10
   Heatmap_Generator:
     # You need to also update `mmcv_config` if you change this value to something else.
     heatmap_size: 72
@@ -62,8 +66,10 @@ Pretrained_Models:
 PeIT:
   model: "beit_base"
   finetune_checkpoint: 'None'
+  # finetune_checkpoint: '/home/galinezh/PERT/Anomaly_trained_models/UBnormal_weighted_loss10/beit_best_floral-grass-15_anomaly.pt'
   checkpoint_root_folder: "/home/galinezh/PERT/Anomaly_trained_models/"
-  custom_run_name: "UBnormal_Freeze1"
+  # custom_run_name: "UBnormal"
+  custom_run_name: "UBnormal_aug2"
   embed_2dpatch: *cj
   drop_rate: 0.0
   attn_drop_rate: 0.0
