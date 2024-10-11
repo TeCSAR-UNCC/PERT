@@ -42,7 +42,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import precision_score, recall_score, f1_score
-
+from tqdm import tqdm
 
 
 
@@ -152,10 +152,10 @@ def validate(model, dl_validation, dataset, device, config=None):
         top5 = AverageMeter()
         all_scores = [] 
         
-        for _, batch in enumerate(dl_validation):
+        for batch in tqdm(dl_validation):
             data = batch[4]
             data = data.to(device)
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast('cuda'):
                 outputs = model(data)
             probabilities = F.softmax(outputs, dim=1) 
             all_scores.extend(probabilities[:, 1].cpu().numpy())
@@ -173,7 +173,7 @@ def anomaly_inference(model, dataset, dl_validation, device, args, path):
             for _, batch in enumerate(dl_validation):
                 heatmaps = batch[4]
                 heatmaps = heatmaps.to(device, non_blocking=True)
-                with torch.cuda.amp.autocast():
+                with torch.amp.autocast('cuda'):
                     outputs = model.inference(heatmaps)
                     batch_size, num_tokens, num_groups = outputs.shape
                     tokens_per_group = num_tokens // num_groups
@@ -192,7 +192,7 @@ def anomaly_inference(model, dataset, dl_validation, device, args, path):
             for _, batch in enumerate(dl_validation):
                 heatmaps = batch[4]
                 heatmaps = heatmaps.to(device, non_blocking=True)
-                with torch.cuda.amp.autocast():
+                with torch.amp.autocast('cuda'):
                     outputs = model.inference(heatmaps)
                     batch_size, num_tokens, num_groups = outputs.shape
                     # tokens_per_group = num_tokens // num_groups
@@ -523,43 +523,52 @@ def main(args):
                 # save_model(chk_path, model, epoch=epoch, roc_val=auc_roc)
                 
                
+            if config.save_all_epochs:
+                print("-> Saving model for epoch: {} ".format(epoch))
+                chk_path = str(full_path / "beit_{}_{}_anomaly.pt".format(epoch, run.name))
+                save_obj = {"epoch": epoch, "weights": model.state_dict()}
+                torch.save(save_obj, chk_path)
+            else:
+                print("-> Starting validation...")
+                start = time.time()
+                config['validation'] = True
+                # acc_val_top1, acc_val_top5, auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
+                #     model,
+                #     loader['validation'],
+                #     dataset['validation'],
+                #     device, 
+                #     config
+                # )
+                # acc_val_top1, acc_val_top5 = validate(
+                #     model,
+                #     loader['validation'],
+                #     dataset['validation'],
+                #     device, 
+                #     config
+                # )
+                auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
+                    model,
+                    loader['validation'],
+                    dataset['validation'],
+                    device, 
+                    config
+                )
+                end = time.time()
+                print("Validation took: {}".format(end - start))
 
-        
-            print("-> Starting validation...")
-            start = time.time()
-            config['validation'] = True
-            # acc_val_top1, acc_val_top5, auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
-            #     model,
-            #     loader['validation'],
-            #     dataset['validation'],
-            #     device, 
-            #     config
-            # )
-            # acc_val_top1, acc_val_top5 = validate(
-            #     model,
-            #     loader['validation'],
-            #     dataset['validation'],
-            #     device, 
-            #     config
-            # )
-            auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
-                model,
-                loader['validation'],
-                dataset['validation'],
-                device, 
-                config
-            )
-            end = time.time()
-            print("Validation took: {}".format(end - start))
+                if val_roc < auc_roc:
+                    # save trained model to wandb as an artifact every epoch's end
 
-            if val_roc < auc_roc:
-                # save trained model to wandb as an artifact every epoch's end
-
-                print("-> Saving model for ROC: {:.2f} ".format(auc_roc))
-                chk_path = str(full_path / "beit_best_{}_anomaly.pt".format(run.name))
-                save_model(chk_path, model, epoch=epoch, roc_val=auc_roc)
+                    print("-> Saving model for ROC: {:.2f} ".format(auc_roc))
+                    chk_path = str(full_path / "beit_best_{}_anomaly.pt".format(run.name))
+                    save_model(chk_path, model, epoch=epoch, roc_val=auc_roc)
+                    
+                    val_roc = auc_roc
+                    
+                    
                 
-                val_roc = auc_roc
+                
+                
             # if val_acc < acc_val_top1:
             #     # save trained model to wandb as an artifact every epoch's end
 

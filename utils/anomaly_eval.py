@@ -143,10 +143,11 @@ def get_clip_score(scores, clip, metadata_np, metadata, per_frame_scores_root, a
     clip_res_fn = os.path.join(per_frame_scores_root, clip)
     clip_gt = np.load(clip_res_fn)
 
-    if args.train_dataset != "UBnormal":
-        clip_gt = np.ones(clip_gt.shape) - clip_gt  # 1 is normal, 0 is abnormal
+    # if args.train_dataset == "UBnormal":
+    #     clip_gt = np.ones(clip_gt.shape) - clip_gt  # 1 is normal, 0 is abnormal
+    clip_gt = np.ones(clip_gt.shape) - clip_gt  # 1 is normal, 0 is abnormal
     
-    scores_zeros = np.ones(clip_gt.shape[0]) * np.inf * -1
+    scores_zeros = np.ones(clip_gt.shape[0]) * np.inf * 1
     if len(clip_fig_idxs) == 0:
         clip_person_scores_dict = {0: np.copy(scores_zeros)}
     else:
@@ -160,6 +161,7 @@ def get_clip_score(scores, clip, metadata_np, metadata, per_frame_scores_root, a
 
         pid_frame_inds = np.array([metadata[i][3] for i in person_metadata_inds]).astype(int)
         clip_person_scores_dict[person_id][pid_frame_inds + int(args.window_size / 2)] = pid_scores
+        
 
     clip_ppl_score_arr = np.stack(list(clip_person_scores_dict.values()))
     clip_score = np.amin(clip_ppl_score_arr, axis=0)

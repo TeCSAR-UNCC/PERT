@@ -190,3 +190,7 @@ cython_debug/
 
 Anomaly_trained_models/
 data/
+config.pkl
+meta.npy
+scores.pkl
+roc_test.py
