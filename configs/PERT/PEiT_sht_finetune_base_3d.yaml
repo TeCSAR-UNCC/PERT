@@ -1,5 +1,5 @@
 # Training settings
-epochs: 1
+epochs: 2
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
@@ -60,7 +60,7 @@ PeIT:
   model: "beit_base"
   finetune_checkpoint: 'None'
   checkpoint_root_folder: "/home/galinezh/PERT/Anomaly_trained_models/"
-  custom_run_name: "SHT_level2_with_pos_1"
+  custom_run_name: "SHT_level2_with_pos_2"
   embed_2dpatch: *cj
   drop_rate: 0.0
   attn_drop_rate: 0.0
