@@ -9,4 +9,4 @@ then
 fi
 
 
-deepspeed --master_port $SOCKET --include localhost:$1 oneShot_transformer.py --cfg ./configs/PERT/PEiT_ntu_finetune_oneShot_base_3d.yaml
+deepspeed --master_port $SOCKET --include localhost:$1 oneShot_transformer.py --cfg ./configs/PERT/PEiT_ntu_finetune_oneShot_base_3d.yaml 2>&1 | tee oneShot.log
