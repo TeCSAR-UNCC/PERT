@@ -74,6 +74,20 @@
       }
     },
     {
+      "name": "oneShot_finetuning",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "oneShot_transformer.py",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "args": ["--cfg", "configs/PERT/PEiT_ntu_finetune_oneShot_base_3d.yaml"],
+      "env": {
+        "WANDB_MODE": "offline"
+        "CUDA_VISIBLE_DEVICES": "0"
+      }
+    },
+
+    {
       "name": "original_finetuning",
       "type": "debugpy",
       "request": "launch",

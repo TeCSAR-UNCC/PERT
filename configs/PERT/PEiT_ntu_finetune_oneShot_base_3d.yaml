@@ -26,13 +26,15 @@ distributed_backend: true
 
 # Dataset Settings
 DATASET:
-  train_dataset: "ntu_mmcv"
-  test_dataset: "ntu_mmcv"
+  train_dataset: "ntu_oneShot"
+  test_dataset: "ntu_oneShot"
   window_size: &dws 48 # Dataset Window Size
   second_heatmap: &dVAE_heatmap_size null
-  num_classes: 120
+  # Here it acts as feature extractor layer
+  num_classes: 2048
   joint_number: &jn 17
   mmcv_config: "configs/nturgbd/ntu120_limb_oneShot.py"
+  n_views: 2
 
   Heatmap_Generator:
     # You need to also update `mmcv_config` if you change this value to something else.
@@ -47,7 +49,7 @@ PeIT:
   model: "beit_base"
   finetune_checkpoint: ""
   checkpoint_root_folder: "/mnt/DATASETS_RAID_28TB/saved_models/current"
-  custom_run_name: "NTU120_SET_RUN1"
+  custom_run_name: "NTU120_OneShot_RUN1"
   embed_2dpatch: *cj
   drop_rate: 0.4
   attn_drop_rate: 0.4
@@ -59,3 +61,4 @@ PeIT:
   num_mask_patches: 204
   max_mask_patches_per_block: null
   min_mask_patches_per_block: 16
+  contrastive_temp: 0.1

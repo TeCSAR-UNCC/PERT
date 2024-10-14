@@ -13,23 +13,45 @@ from operator import itemgetter
 from torch import Tensor
 
 
+def get_class_label(filename):
+    # Remove the file extension
+    filename = filename.split(".")[0]
+
+    # Extract the last 3 digits which represent the action class
+    class_label = int(filename[-3:]) - 1
+
+    return class_label
+
 
 class NTU_oneShot(Dataset):
-    def __init__(self, cfg, loader_type='train', joint_reduction=True, **kwargs):
+    def __init__(self, cfg, loader_type="train", **kwargs):
         super().__init__(**kwargs)
         self.cfg = cfg
         mmcv_cfg = Config.fromfile(cfg.DATASET.mmcv_config)
 
         self.loader_type = loader_type
-        self.is_training = self.loader_type == 'train'
-        if loader_type == 'train':
+        self.is_training = self.loader_type == "train"
+
+        skl_filename = None
+        skl_meta = None
+        if loader_type == "train":
             self.ds = build_dataset(mmcv_cfg.data.train)
-            self.action_set = mmcv.load(mmcv_cfg.data.train.dataset.ann_file)['split']['action_set']
-        elif loader_type == 'val':
+            skl_meta = mmcv.load(mmcv_cfg.data.train.dataset.ann_file)["split"]
+            skl_filenames = skl_meta["oneShot_train"]
+            self.action_set = skl_meta["action_set"]
+
+        elif loader_type == "val":
             self.ds = build_dataset(mmcv_cfg.data.val)
         else:
             self.ds = build_dataset(mmcv_cfg.data.exemplar)
-        
+
+        self.labels = []
+        if skl_meta is not None:
+            for skl_filename in skl_filenames:
+                self.labels.append(get_class_label(skl_filename))
+        self.labels = self.labels * mmcv_cfg.data.train.times
+
+        print("Finished creating one shot dataset...")
 
     def __len__(self):
         return len(self.ds)
@@ -41,26 +63,10 @@ class NTU_oneShot(Dataset):
             imgs = imgs.permute((1, 0, 2, 3))
             imgs, _ = imgs.max(axis=1)
         if self.is_training:
-            pos_act = int(label) + 1
-            pos_idx = np.random.choice(self.action_set[pos_act])
-
-            keys = np.array(list(self.action_set.keys()))
-            pos_mask = keys != pos_act
-            neg_act = np.random.choice(keys[pos_mask])
-            neg_idx = np.random.choice(self.action_set[neg_act])
-
-            pos = itemgetter("imgs")(self.ds.__getitem__(pos_idx)).squeeze(0)
-            neg = itemgetter("imgs")(self.ds.__getitem__(neg_idx)).squeeze(0)
-            
-            if self.cfg.DATASET.Heatmap_Generator.joint_reduction:
-                pos = pos.permute((1, 0, 2, 3))
-                pos, _ = pos.max(axis=1)
-                neg = neg.permute((1, 0, 2, 3))
-                neg, _ = neg.max(axis=1)
-
-            return [imgs, pos, neg, label[0]]
+            return [imgs, label[0]]
         else:
             return [imgs, label]
+
 
 # DATASET = edict({
 #   'train_dataset': "ntu_mmcv",
