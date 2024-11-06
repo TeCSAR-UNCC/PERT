@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import cv2
 import os
@@ -7,6 +9,7 @@ from scipy import interpolate
 import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
 from collections import OrderedDict
+from typing import List
 
 def get_model_size(model):
     param_size = 0
@@ -99,7 +102,7 @@ def heatmap_visualization(heatmap, video_name="heatmap_video.mp4"):
     out.release()
 
 
-def scale_center_per_frame(keypoints_frames: list[Keypoint], N: int):
+def scale_center_per_frame(keypoints_frames: List[Keypoint], N: int):
     scaled_and_centered_frames = []
 
     for frame_kps in keypoints_frames:
@@ -146,7 +149,7 @@ def scale_center_per_frame(keypoints_frames: list[Keypoint], N: int):
     return scaled_and_centered_frames
 
 
-def scale(keypoints_frames: list[Keypoint], N: int) -> list[Keypoint]:
+def scale(keypoints_frames: List[Keypoint], N: int) -> list[Keypoint]:
     # Calculate global bounding box across all frames
     global_min_x = min(min(kp.x for kp in frame) for frame in keypoints_frames)
     global_max_x = max(max(kp.x for kp in frame) for frame in keypoints_frames)

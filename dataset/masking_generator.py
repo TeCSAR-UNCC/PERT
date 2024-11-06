@@ -26,6 +26,7 @@ import random
 import math
 import numpy as np
 from numpy.typing import NDArray
+from typing import Optional
 
 
 def generate_mask_from_points(points, H, W, S, min_masked_number, max_masked_number):
@@ -276,7 +277,7 @@ class MaskingGenerator:
     def __call__(
         self,
         heatmap=None,
-        keypoints: NDArray | None = None,
+        keypoints: Optional[NDArray] = None,
         normal_blocking_chance=0.7,
         is_training=True,
     ):
