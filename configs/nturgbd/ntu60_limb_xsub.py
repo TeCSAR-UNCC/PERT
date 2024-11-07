@@ -18,7 +18,7 @@ model = dict(
 )
 
 dataset_type = "PoseDataset"
-ann_file = "/mnt/DATASETS_RAID_28TB/nturgbd/processed_pkl_2d/ntu60_hrnet.pkl"
+ann_file = "db/ntu60_hrnet.pkl"
 left_kp = [1, 3, 5, 7, 9, 11, 13, 15]
 right_kp = [2, 4, 6, 8, 10, 12, 14, 16]
 skeletons = [

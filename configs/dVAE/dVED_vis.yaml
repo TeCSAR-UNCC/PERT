@@ -12,19 +12,18 @@ starting_temp: 1.0 # Starting temperature
 temp_min: 0.46165 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
 batch_size: &bts 48
-device: 'cpu'
+device: "cpu"
 world_size: 3
 num_workers: 16
 gradient_clipping: 3
 fp16_training: True
-wandb_log_dir: '/mnt/DATASETS_RAID_28TB/WAND_B/current/'
+wandb_log_dir: "/mnt/DATASETS_RAID_28TB/WAND_B/current/"
 
 #NOTE: Not sure what it is.
-transparent: true 
+transparent: true
 
 deepspeed: true
 distributed_backend: true
-                                                             
 
 # Dataset Settings
 DATASET:
@@ -39,31 +38,32 @@ DATASET:
   # Heatmap Generator
   Heatmap_Generator:
     # You need to also update `mmcv_config` if you change this value to something else.
-    heatmap_size: 72
+    heatmap_size: &hms 72 # Heatmap Size
     joint_reduction: &cj false
 
 # Model Settings
 VAE_Params:
   image_size: *hms
-  num_layers: 4 # Number of layers (should be 3 or above)
-  num_tokens: 4096 # Number of image tokens
+  num_layers: 2 # Number of layers (should be 3 or above)
+  num_tokens: 8096 # Number of image tokens
   codebook_dim: 512
   hidden_dim: 256
-  channels: *dws
+  channels: *jn
   num_resnet_blocks: 1 # Number of residual net blocks
   smooth_l1_loss: true
   normalization: null
   use_SiLU: True
+  d3d_decoder: false
 
 Pretrained_Models:
-    discrete_vae_weight_path: '/mnt/DATASETS_RAID_28TB/saved_models/03_16/saved_models/vae_48_panoptic_sparkling-dust-77.pt'
-    prefix_saved_file: ''
+  discrete_vae_weight_path: "./saved_models/vae_48_panoptic_super-serenity-1.pt"
+  prefix_saved_file: ""
 
 PeIT:
-  model: 'beit_base_patch16'
-  finetune_checkpoint: ''
-  checkpoint_root_folder: '/mnt/DATASETS_RAID_28TB/saved_models/current'
-  custom_run_name: 'RUN1_HEATMAP_ResBlock_BASE'
+  model: "beit_base_patch16"
+  finetune_checkpoint: ""
+  checkpoint_root_folder: "/mnt/DATASETS_RAID_28TB/saved_models/current"
+  custom_run_name: "RUN1_HEATMAP_ResBlock_BASE"
   embed_2dpatch: *cj
   window_size:
     - 0

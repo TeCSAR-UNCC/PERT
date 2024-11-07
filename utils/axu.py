@@ -10,6 +10,10 @@ import imgaug.augmenters as iaa
 from imgaug.augmentables import Keypoint, KeypointsOnImage
 from collections import OrderedDict
 from typing import List
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use('TkAgg')  
+
 
 def get_model_size(model):
     param_size = 0
@@ -763,6 +767,94 @@ def init_distributed_mode(args):
     torch.distributed.barrier()
     setup_for_distributed(args.rank == 0)
 
+
+
+def plot_heatmap(data, title='Heatmap', cmap='viridis', show_values=False, 
+                 figsize=(10, 8), save_path=None, show_colorbar=True):
+    """
+    Create and display a heatmap using matplotlib.
+    
+    Parameters:
+    data: np.ndarray - 2D array of shape [H, W]
+    title: str - Title of the plot
+    cmap: str - Colormap name
+    show_values: bool - Whether to display values in cells
+    figsize: tuple - Figure size in inches
+    save_path: str - Path to save the figure (optional)
+    show_colorbar: bool - Whether to show the colorbar
+    """
+    # Create figure and axes
+    plt.figure(figsize=figsize)
+    
+    # Create heatmap
+    im = plt.imshow(data, cmap=cmap, aspect='auto')
+    
+    # Add colorbar
+    if show_colorbar:
+        plt.colorbar(im)
+    
+    # Add title
+    plt.title(title)
+    
+    # Show values in cells if requested
+    if show_values:
+        height, width = data.shape
+        for i in range(height):
+            for j in range(width):
+                color = 'white' if im.norm(data[i, j]) > 0.5 else 'black'
+                plt.text(j, i, f'{data[i, j]:.1f}', 
+                        ha='center', va='center', color=color)
+    
+    # Tight layout to prevent label cutoff
+    plt.tight_layout()
+    
+    # Save if path provided
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.show()
+
+def save_array_as_video(array, output_path, fps=30, codec='mp4v'):
+    """
+    Save a numpy array of shape [T, 3, H, W] as a video file.
+    
+    Parameters:
+    array: np.ndarray - Input array of shape [T, 3, H, W] with values in range [0, 255]
+    output_path: str - Path where the video will be saved (include .mp4 extension)
+    fps: int - Frames per second for the output video
+    codec: str - FourCC codec code (e.g., 'mp4v' for .mp4, 'XVID' for .avi)
+    """
+    # Verify input shape
+    assert len(array.shape) == 4, f"Expected 4D array, got shape {array.shape}"
+    assert array.shape[1] == 3, f"Expected 3 channels, got {array.shape[1]}"
+    
+    # Get dimensions
+    T, C, H, W = array.shape
+    
+    # Create video writer
+    fourcc = cv2.VideoWriter_fourcc(*codec)
+    out = cv2.VideoWriter(output_path, fourcc, fps, (W, H))
+    
+    try:
+        # Write each frame
+        for t in range(T):
+            # Convert from [3, H, W] to [H, W, 3] and BGR to RGB
+            frame = array[t].transpose(1, 2, 0)[..., ::-1]
+            
+            # Ensure frame is uint8
+            if frame.dtype != np.uint8:
+                if frame.max() <= 1.0:
+                    frame = (frame * 255).astype(np.uint8)
+                else:
+                    frame = frame.astype(np.uint8)
+            
+            # Write the frame
+            out.write(frame)
+            
+    finally:
+        # Release the video writer
+        out.release()
 
 def convert_to_rgb_3d(array, offset=10):
     """

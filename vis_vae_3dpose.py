@@ -1,27 +1,14 @@
-import math
-from math import sqrt
 import argparse
-from pathlib import Path
-
-# torch
+from math import sqrt
 
 import torch
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import CyclicLR
-
-# vision imports
-
-from torchvision import transforms as T
-from torch.utils.data import DataLoader
-from torchvision.datasets import ImageFolder
-from torchvision.utils import make_grid, save_image
 
 
 # For DS
 import dataset
 
 # heatmap to color
-from utils.axu import convert_to_rgb_3d, AverageMeter
+from utils.axu import convert_to_rgb_3d, save_array_as_video, plot_heatmap
 
 # argument parsing
 
@@ -58,12 +45,40 @@ device = torch.device(config.device)
 
 
 dVAE = get_dVAE(config)
-dVAE = dVAE.to(device)
+if torch.cuda.is_available():
+    print("Using cuda...")
+    dVAE = dVAE.cuda()
 
-idx = 0
+#idx = 1245
+import random
+idx = random.randint(0, len(ds)-1)
 heatmaps, labels = ds[idx]
-heatmaps = heatmaps.to(device)
-input_ids = dVAE.get_codebook_indices(heatmaps).flatten(1)
+heatmaps = torch.unsqueeze(heatmaps, 0)
+if torch.cuda.is_available():
+    heatmaps = heatmaps.cuda()
+codes = dVAE.get_codebook_indices(heatmaps)
+hard_recons = dVAE.decode(codes)
+
+heatmaps, hard_recons = map(
+    lambda t: t.detach().cpu(), (heatmaps,  hard_recons)
+)
 
 collapsed_heatmap = heatmaps.numpy().max(axis=1).astype("float32")
 heatmaps_rgb = convert_to_rgb_3d(collapsed_heatmap)
+recons_heatmap = hard_recons.numpy().astype("float32")
+recons_heatmap_rgb = convert_to_rgb_3d(recons_heatmap)
+
+save_array_as_video(heatmaps_rgb, "ntu_gt_{}.mp4".format(idx))
+save_array_as_video(recons_heatmap_rgb, "ntu_recons_{}.mp4".format(idx))
+
+b, n = codes.shape
+h = w = int(sqrt(n))
+
+from einops import rearrange
+
+codes_sqr = rearrange(codes, "b (h w) -> b h w", h=h, w=w)
+
+codes_sqr = torch.squeeze(codes_sqr, 0).cpu().numpy()
+plot_heatmap(codes_sqr, save_path='figs/code_{}.pdf'.format(idx))
+
+print("Finished")
