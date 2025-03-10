@@ -44,8 +44,28 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import precision_score, recall_score, f1_score
 from tqdm import tqdm
 
+import csv
+import os
 
 
+def save_to_csv(filename, run_name, val_roc, ab_w, w_decay, ab_aug):
+    # Check if the file exists
+    file_exists = os.path.isfile(filename)
+
+    # Prepare the row data
+    row = ["beit_best_{}_anomaly.pt".format(run_name), val_roc, ab_w, w_decay, ab_aug]
+
+    # Open the file in append mode
+    with open(filename, mode='a', newline='') as file:
+        writer = csv.writer(file)
+
+        # If the file doesn't exist, write the header first
+        if not file_exists:
+            writer.writerow(['Model_Name', 'Val_ROC', 'Abnormal_W', 'Weight_Decay', 'Abnormal_Augmentation'])
+
+        # Write the new row
+        writer.writerow(row)
+        
 class FocalLoss(nn.Module):
     def __init__(self, alpha=0.75, gamma=2.0, weight=None, reduction='mean'):
         """
@@ -577,34 +597,28 @@ def main(args):
             #     save_model(chk_path, model, epoch=epoch, acc_val=acc_val_top1)
             #     val_acc = acc_val_top1
 
+        save_to_csv(config.csv_name, "beit_best_{}_anomaly.pt".format(run.name), val_roc, config.abnormal_w, config.weight_decay, config.DATASET.aug_abnormal)
         wandb.finish()
-        print("-> Starting Test...")
-        config['validation'] = False
-        start = time.time()
-        # anomaly_inference (model, dataset['test'], loader['test'], device, config.DATASET, str(full_path))
-        # acc_val_top1, acc_val_top5, auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
-        #             model,
-        #             loader['test'],
-        #             dataset['test'],
-        #             device, 
-        #             config
-        #         )
         
-        auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
-                model,
-                loader['test'],
-                dataset['test'],
-                device, 
-                config
-            )
-        end = time.time()
+        # print("-> Starting Test...")
+        # config['validation'] = False
+        # start = time.time()
         
-        print("Validation took: {}".format(end - start))
-        print('AUC ROC: {}'.format(auc_roc))
-        print('AUC PR: {}'.format(auc_pr))
-        print('EER: {}'.format(eer))
-        print('EER TH: {}'.format(eer_th))
-        print('10ER: {}'.format(fpr_at_target_fnr))
+        # auc_roc, auc_pr, eer, eer_th, fpr_at_target_fnr = validate(
+        #         model,
+        #         loader['test'],
+        #         dataset['test'],
+        #         device, 
+        #         config
+        #     )
+        # end = time.time()
+        
+        # print("Validation took: {}".format(end - start))
+        # print('AUC ROC: {}'.format(auc_roc))
+        # print('AUC PR: {}'.format(auc_pr))
+        # print('EER: {}'.format(eer))
+        # print('EER TH: {}'.format(eer_th))
+        # print('10ER: {}'.format(fpr_at_target_fnr))
         # print('Accuracy: {}'.format(acc_val_top1))
     
     else:

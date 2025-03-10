@@ -1,0 +1,13 @@
+Model_Name,Val_ROC,Abnormal_W,Weight_Decay,Abnormal_Augmentation
+beit_best_beit_best_proud-thunder-28_anomaly.pt_anomaly.pt,0.7861633889616988,1,0.0003,10
+beit_best_beit_best_lilac-pyramid-31_anomaly.pt_anomaly.pt,0.792886878283479,1,0.0003,15
+beit_best_beit_best_deft-violet-33_anomaly.pt_anomaly.pt,0.774370961720116,1,0.0006,10
+beit_best_beit_best_resilient-durian-35_anomaly.pt_anomaly.pt,0.7874123710299353,1,0.0006,15
+beit_best_beit_best_rosy-salad-37_anomaly.pt_anomaly.pt,0.7850573868431558,2,0.0003,10
+beit_best_beit_best_wandering-field-39_anomaly.pt_anomaly.pt,0.786543529291508,2,0.0003,15
+beit_best_beit_best_chocolate-sky-42_anomaly.pt_anomaly.pt,0.7958854213339037,2,0.0006,10
+beit_best_beit_best_desert-mountain-44_anomaly.pt_anomaly.pt,0.7935587564050514,2,0.0006,15
+beit_best_beit_best_major-pyramid-46_anomaly.pt_anomaly.pt,0.7913006493472186,3,0.0003,10
+beit_best_beit_best_serene-river-48_anomaly.pt_anomaly.pt,0.790282741124213,3,0.0003,15
+beit_best_beit_best_true-sunset-50_anomaly.pt_anomaly.pt,0.7992246272448578,3,0.0006,10
+beit_best_beit_best_icy-energy-51_anomaly.pt_anomaly.pt,0.8024548431162284,3,0.0006,15

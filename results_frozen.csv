@@ -1,0 +1,13 @@
+Model_Name,Val_ROC,Abnormal_W,Weight_Decay,Abnormal_Augmentation
+beit_best_beit_best_woven-thunder-29_anomaly.pt_anomaly.pt,0.5240780181300795,1,0.0003,10
+beit_best_beit_best_swept-resonance-30_anomaly.pt_anomaly.pt,0.5319959147240629,1,0.0003,15
+beit_best_beit_best_atomic-terrain-32_anomaly.pt_anomaly.pt,0.5285422207518982,1,0.0006,10
+beit_best_beit_best_restful-surf-34_anomaly.pt_anomaly.pt,0.5313413415078609,1,0.0006,15
+beit_best_beit_best_vital-sponge-36_anomaly.pt_anomaly.pt,0.5276774044441487,2,0.0003,10
+beit_best_beit_best_deft-surf-38_anomaly.pt_anomaly.pt,0.5342148974205699,2,0.0003,15
+beit_best_beit_best_legendary-butterfly-40_anomaly.pt_anomaly.pt,0.5280210098709628,2,0.0006,10
+beit_best_beit_best_pretty-shadow-41_anomaly.pt_anomaly.pt,0.5333953521681639,2,0.0006,15
+beit_best_beit_best_rosy-snow-43_anomaly.pt_anomaly.pt,0.5276491348828966,3,0.0003,10
+beit_best_beit_best_lucky-plasma-45_anomaly.pt_anomaly.pt,0.5355522820268522,3,0.0003,15
+beit_best_beit_best_toasty-shape-47_anomaly.pt_anomaly.pt,0.5279842578719665,3,0.0006,10
+beit_best_beit_best_unique-music-49_anomaly.pt_anomaly.pt,0.533606170694896,3,0.0006,15

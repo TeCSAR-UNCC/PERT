@@ -1,5 +1,5 @@
 # Training settings
-epochs: 35
+epochs: 10
 #Not used for `triangular2` cyclic!
 lr_decay: 0.99
 anneal_rate: 0.000001 # Temperature annealing rate
@@ -12,17 +12,18 @@ starting_temp: 1.0 # Starting temperature
 temp_min: 0.5 # Minimum temperature to anneal to
 num_images_save: 4 # Number of images to save
 batch_size: &bs 16
-device: "cuda:2"
+device: "cuda:1"
 world_size: 1
 num_workers: 8
 repeated_size_of_dataset: 10joint_reduction and embed
 extra_project_name: "set120"
 freeze_backbone: False
 focal_loss: false
-alpha: 0.9
-gamma: 2.0
-abnormal_w: 2.0
-save_all_epochs: true
+alpha: 0.85
+gamma: 2
+abnormal_w: 1
+save_all_epochs: false
+csv_name: 'results_unfrozen.csv'
 
 #NOTE: Not sure what it is.
 transparent: true
@@ -68,10 +69,10 @@ Pretrained_Models:
 PeIT:
   model: "beit_base"
   # finetune_checkpoint: 'None'
-  finetune_checkpoint: '/home/galinezh/PERT/Anomaly_trained_models/UBnormal_aug3/beit_20_dark-snow-25_anomaly.pt'
+  finetune_checkpoint: '/home/galinezh/PERT/Anomaly_trained_models/UBnormal_unfrozen_search_6_best/beit_best_wandering-field-39_anomaly.pt'
   checkpoint_root_folder: "/home/galinezh/PERT/Anomaly_trained_models/"
-  # custom_run_name: "UBnormal"
-  custom_run_name: "UBnormal_aug3"
+  # custom_run_name: "UBnormal_unfrozen_search_1"
+  custom_run_name: "UBnormal_unfrozen_search_1"
   embed_2dpatch: *cj
   drop_rate: 0.0
   attn_drop_rate: 0.0
